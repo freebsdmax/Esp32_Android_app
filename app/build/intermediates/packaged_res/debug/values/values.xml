@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="esp32_blue">#FF2196F3</color>
+    <color name="esp32_green">#FF4CAF50</color>
+    <color name="esp32_orange">#FFFF9800</color>
+    <color name="esp32_red">#FFF44336</color>
+    <color name="ic_launcher_background">#FF2196F3</color>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="white">#FFFFFFFF</color>
+    <string name="app_name">ESP32 Player Control</string>
+    <string name="cancel">Cancel</string>
+    <string name="clear">Clear</string>
+    <string name="error">Error</string>
+    <string name="loading">Loading...</string>
+    <string name="next">Next</string>
+    <string name="ota_updates">OTA Updates</string>
+    <string name="pause">Pause</string>
+    <string name="play">Play</string>
+    <string name="player_title">ESP32 Music Player</string>
+    <string name="previous">Previous</string>
+    <string name="refresh">Refresh</string>
+    <string name="restart">Restart</string>
+    <string name="save">Save</string>
+    <string name="select_file">Select File</string>
+    <string name="success">Success</string>
+    <string name="system_monitor">System Monitor</string>
+    <string name="upload">Upload</string>
+    <string name="wifi_settings">Wi-Fi Settings</string>
+    <style name="Theme.AndroidPlayer" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/esp32_blue</item>
+        <item name="android:navigationBarColor">@color/esp32_blue</item>
+    </style>
+</resources>

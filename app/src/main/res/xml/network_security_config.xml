@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Дозволити cleartext лише для локальної IP ESP32 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain>192.168.4.1</domain>
+    </domain-config>
+
+    <!-- За замовчуванням забороняємо cleartext для інших доменів -->
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background padding for adaptive icon -->
+    <group android:translateX="22" android:translateY="22">
+        <!-- Music note icon -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M32,8L32,40C30.9,40 30,40.9 30,42C30,43.1 30.9,44 32,44L54,44L54,56L42,56L42,62L54,62L54,68C54,69.1 53.1,70 52,70L30,70C28.9,70 28,69.1 28,68L28,8L32,8Z"/>
+        <!-- Sound waves -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M60,34C60,34 63,37 63,42C63,47 60,50 60,50"
+            android:strokeWidth="2"
+            android:strokeColor="#FFFFFF"/>
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M64,30C64,30 69,35 69,42C69,49 64,54 64,54"
+            android:strokeWidth="2"
+            android:strokeColor="#FFFFFF"/>
+    </group>
+</vector>
