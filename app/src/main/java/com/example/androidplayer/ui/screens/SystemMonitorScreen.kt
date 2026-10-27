@@ -203,7 +203,9 @@ private fun LogSettingsSection(
     onLoadCurrentSettings: () -> Unit
 ) {
     var expandedLevel by remember { mutableStateOf(false) }
-    var expandedComponent by remember { mutableStateOf(false) }
+    var selectedLogLevel by remember(uiState.logLevel) { mutableStateOf(uiState.logLevel) }
+    var verboseLogs by remember(uiState.verboseLogs) { mutableStateOf(uiState.verboseLogs) }
+    var componentLogs by remember(uiState.componentLogSettings) { mutableStateOf(uiState.componentLogSettings) }
     
     Card(
         modifier = Modifier.fillMaxWidth()
@@ -224,7 +226,7 @@ private fun LogSettingsSection(
                 onExpandedChange = { expandedLevel = !expandedLevel }
             ) {
                 OutlinedTextField(
-                    value = getLogLevelName(uiState.logLevel),
+                    value = getLogLevelName(selectedLogLevel),
                     onValueChange = { },
                     readOnly = true,
                     label = { Text("Уровень логов") },
@@ -242,7 +244,7 @@ private fun LogSettingsSection(
                         DropdownMenuItem(
                             text = { Text(level.displayName) },
                             onClick = {
-                                // Обновляем только локально, сохраняем при нажатии "Сохранить"
+                                selectedLogLevel = level.value
                                 expandedLevel = false
                             }
                         )
@@ -258,8 +260,8 @@ private fun LogSettingsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Switch(
-                    checked = uiState.verboseLogs,
-                    onCheckedChange = { /* Обновляем локально */ }
+                    checked = verboseLogs,
+                    onCheckedChange = { verboseLogs = it }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Детальные логи (эмодзи и баннеры)")
@@ -276,11 +278,21 @@ private fun LogSettingsSection(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            ComponentLogItem("Player", uiState.componentLogSettings.player == 1) { /* Переключаем локально */ }
-            ComponentLogItem("WiFi CAN Sniffer", uiState.componentLogSettings.wifi_can_sniffer == 1) { /* Переключаем локально */ }
-            ComponentLogItem("Web OTA", uiState.componentLogSettings.web_ota == 1) { /* Переключаем локально */ }
-            ComponentLogItem("UART OTA", uiState.componentLogSettings.uart_ota == 1) { /* Переключаем локально */ }
-            ComponentLogItem("ELM327", uiState.componentLogSettings.elm327 == 1) { /* Переключаем локально */ }
+            ComponentLogItem("Player", componentLogs.player == 1) {
+                componentLogs = componentLogs.copy(player = if (componentLogs.player == 1) 0 else 1)
+            }
+            ComponentLogItem("WiFi CAN Sniffer", componentLogs.wifi_can_sniffer == 1) {
+                componentLogs = componentLogs.copy(wifi_can_sniffer = if (componentLogs.wifi_can_sniffer == 1) 0 else 1)
+            }
+            ComponentLogItem("Web OTA", componentLogs.web_ota == 1) {
+                componentLogs = componentLogs.copy(web_ota = if (componentLogs.web_ota == 1) 0 else 1)
+            }
+            ComponentLogItem("UART OTA", componentLogs.uart_ota == 1) {
+                componentLogs = componentLogs.copy(uart_ota = if (componentLogs.uart_ota == 1) 0 else 1)
+            }
+            ComponentLogItem("ELM327", componentLogs.elm327 == 1) {
+                componentLogs = componentLogs.copy(elm327 = if (componentLogs.elm327 == 1) 0 else 1)
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -300,9 +312,9 @@ private fun LogSettingsSection(
                 Button(
                     onClick = {
                         onUpdateSettings(
-                            uiState.logLevel,
-                            uiState.verboseLogs,
-                            uiState.componentLogSettings
+                            selectedLogLevel,
+                            verboseLogs,
+                            componentLogs
                         )
                     },
                     modifier = Modifier.weight(1f)

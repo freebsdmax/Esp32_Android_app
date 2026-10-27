@@ -9,6 +9,7 @@ object NavConstants {
     const val WIFI_SETTINGS_SCREEN = "wifi_settings"
     const val OTA_SCREEN = "ota"
     const val SYSTEM_MONITOR_SCREEN = "system_monitor"
+    const val BLE_DISCOVERY_SCREEN = "ble_discovery"
 }
 
 /**
@@ -27,4 +28,5 @@ object NavRoutes {
     const val WIFI_SETTINGS = "/wifi_settings"
     const val OTA = "/ota"
     const val SYSTEM_MONITOR = "/system_monitor"
+    const val BLE_DISCOVERY = "/ble_discovery"
 }

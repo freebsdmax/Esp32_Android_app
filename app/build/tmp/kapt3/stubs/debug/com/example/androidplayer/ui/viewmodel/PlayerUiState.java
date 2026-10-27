@@ -3,6 +3,7 @@ package com.example.androidplayer.ui.viewmodel;
 import androidx.lifecycle.ViewModel;
 import com.example.androidplayer.data.model.*;
 import com.example.androidplayer.data.repository.Esp32PlayerRepository;
+import com.example.androidplayer.data.ble.BlePlayerClient;
 import dagger.hilt.android.lifecycle.HiltViewModel;
 import kotlinx.coroutines.flow.StateFlow;
 import timber.log.Timber;

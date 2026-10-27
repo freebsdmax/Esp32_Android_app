@@ -46,6 +46,11 @@ fun MainNavigation() {
             title = "Логи",
             icon = Icons.Default.Terminal,
             route = NavRoutes.SYSTEM_MONITOR
+        ),
+        NavigationItem(
+            title = "BLE",
+            icon = Icons.Default.Bluetooth,
+            route = NavRoutes.BLE_DISCOVERY
         )
     )
     
@@ -99,6 +104,16 @@ fun MainNavigation() {
             }
             composable(NavRoutes.SYSTEM_MONITOR) {
                 SystemMonitorScreen()
+            }
+            composable(NavRoutes.BLE_DISCOVERY) {
+                BleDiscoveryScreen(
+                    onDeviceSelected = { deviceAddress ->
+                        // Сохраняємо адресу пристрою для подальшого використання
+                    },
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
             }
         }
     }

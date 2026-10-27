@@ -6,8 +6,11 @@ import android.view.View;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.SavedStateHandle;
 import androidx.lifecycle.ViewModel;
+import com.example.androidplayer.data.ble.BlePlayerClient;
 import com.example.androidplayer.data.network.Esp32PlayerApi;
 import com.example.androidplayer.data.repository.Esp32PlayerRepository;
+import com.example.androidplayer.di.BleModule;
+import com.example.androidplayer.di.BleModule_ProvideBlePlayerClientFactory;
 import com.example.androidplayer.di.NetworkModuleDi;
 import com.example.androidplayer.di.NetworkModuleDi_ProvideEsp32PlayerApiFactory;
 import com.example.androidplayer.di.NetworkModuleDi_ProvideGsonFactory;
@@ -81,6 +84,15 @@ public final class DaggerAndroidPlayerApplication_HiltComponents_SingletonC {
 
     public Builder applicationContextModule(ApplicationContextModule applicationContextModule) {
       this.applicationContextModule = Preconditions.checkNotNull(applicationContextModule);
+      return this;
+    }
+
+    /**
+     * @deprecated This module is declared, but an instance is not used in the component. This method is a no-op. For more, see https://dagger.dev/unused-modules.
+     */
+    @Deprecated
+    public Builder bleModule(BleModule bleModule) {
+      Preconditions.checkNotNull(bleModule);
       return this;
     }
 
@@ -489,7 +501,7 @@ public final class DaggerAndroidPlayerApplication_HiltComponents_SingletonC {
           return (T) new OtaViewModel(singletonCImpl.provideEsp32PlayerRepositoryProvider.get());
 
           case 1: // com.example.androidplayer.ui.viewmodel.PlayerViewModel 
-          return (T) new PlayerViewModel(singletonCImpl.provideEsp32PlayerRepositoryProvider.get());
+          return (T) new PlayerViewModel(singletonCImpl.provideEsp32PlayerRepositoryProvider.get(), singletonCImpl.provideBlePlayerClientProvider.get());
 
           case 2: // com.example.androidplayer.ui.viewmodel.SettingsViewModel 
           return (T) new SettingsViewModel(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
@@ -589,6 +601,8 @@ public final class DaggerAndroidPlayerApplication_HiltComponents_SingletonC {
 
     private Provider<Esp32PlayerRepository> provideEsp32PlayerRepositoryProvider;
 
+    private Provider<BlePlayerClient> provideBlePlayerClientProvider;
+
     private SingletonCImpl(ApplicationContextModule applicationContextModuleParam) {
       this.applicationContextModule = applicationContextModuleParam;
       initialize(applicationContextModuleParam);
@@ -602,10 +616,11 @@ public final class DaggerAndroidPlayerApplication_HiltComponents_SingletonC {
       this.provideRetrofitProvider = DoubleCheck.provider(new SwitchingProvider<Retrofit>(singletonCImpl, 2));
       this.provideEsp32PlayerApiProvider = DoubleCheck.provider(new SwitchingProvider<Esp32PlayerApi>(singletonCImpl, 1));
       this.provideEsp32PlayerRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<Esp32PlayerRepository>(singletonCImpl, 0));
+      this.provideBlePlayerClientProvider = DoubleCheck.provider(new SwitchingProvider<BlePlayerClient>(singletonCImpl, 5));
     }
 
     @Override
-    public void injectAndroidPlayerApplication(AndroidPlayerApplication androidPlayerApplication) {
+    public void injectAndroidPlayerApplication(AndroidPlayerApplication arg0) {
     }
 
     @Override
@@ -651,6 +666,9 @@ public final class DaggerAndroidPlayerApplication_HiltComponents_SingletonC {
 
           case 4: // com.google.gson.Gson 
           return (T) NetworkModuleDi_ProvideGsonFactory.provideGson();
+
+          case 5: // com.example.androidplayer.data.ble.BlePlayerClient 
+          return (T) BleModule_ProvideBlePlayerClientFactory.provideBlePlayerClient(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
           default: throw new AssertionError(id);
         }

@@ -1,5 +1,6 @@
 package com.example.androidplayer;
 
+import com.example.androidplayer.di.BleModule;
 import com.example.androidplayer.di.NetworkModuleDi;
 import com.example.androidplayer.di.RepositoryModule;
 import com.example.androidplayer.ui.viewmodel.OtaViewModel_HiltModules;
@@ -133,6 +134,7 @@ public final class AndroidPlayerApplication_HiltComponents {
           ActivityRetainedCBuilderModule.class,
           ServiceCBuilderModule.class,
           ApplicationContextModule.class,
+          BleModule.class,
           HiltWrapper_FragmentGetContextFix_FragmentGetContextFixModule.class,
           NetworkModuleDi.class,
           RepositoryModule.class

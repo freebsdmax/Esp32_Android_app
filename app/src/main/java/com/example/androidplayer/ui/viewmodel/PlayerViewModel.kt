@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.androidplayer.data.model.*
 import com.example.androidplayer.data.repository.Esp32PlayerRepository
+import com.example.androidplayer.data.ble.BlePlayerClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,9 +18,9 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
-    private val repository: Esp32PlayerRepository
+    private val repository: Esp32PlayerRepository,
+    val bleClient: BlePlayerClient
 ) : ViewModel() {
-    
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
     
@@ -28,11 +29,46 @@ class PlayerViewModel @Inject constructor(
     
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
-    
+
     init {
-        // Загружаем начальные данные
+        if (bleClient.hasRememberedDevice()) {
+            repository.setBleClient(bleClient)
+            bleClient.connectRememberedDevice()
+        }
+        viewModelScope.launch {
+            bleClient.serviceReady.collect { ready ->
+                if (ready) {
+                    repository.setBleClient(bleClient)
+                    loadAfterBleReady()
+                } else if (!bleClient.hasRememberedDevice()) {
+                    repository.switchTransport(false)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Підключити BLE клієнт та перемкнути в BLE режим
+     */
+    fun connectBleClient() {
+        Timber.d("📡 connectBleClient() called")
+        Timber.d("📡 bleClient isConnected: ${bleClient.isConnected.value}")
+        repository.setBleClient(bleClient)
+        Timber.d("✅ BLE client connected, switching to BLE transport")
+        Timber.d("📡 Repository now using BLE: ${repository.isBleTransport()}")
+    }
+
+    fun loadAfterBleReady() {
         loadPlayerStatus()
         loadPlaylist()
+    }
+    
+    /**
+     * Відключити BLE та повернутись в HTTP режим
+     */
+    fun disconnectBle() {
+        repository.disconnectBle()
+        Timber.d("🔌 BLE disconnected, switching to HTTP transport")
     }
     
     /**
@@ -176,6 +212,7 @@ class PlayerViewModel @Inject constructor(
      */
     fun switchMode() {
         viewModelScope.launch {
+            Timber.d("🔄 switchMode() called, useBleTransport=${repository.isBleTransport()}")
             repository.switchMode().fold(
                 onSuccess = {
                     val currentMode = _uiState.value.mode
@@ -246,6 +283,9 @@ class PlayerViewModel @Inject constructor(
      * Quietly poll player status without toggling loading/error UI (used for live position updates)
      */
     fun pollPlayerStatus() {
+        // Якщо BLE ще не активований, не робимо HTTP-запросів (уникаємо 192.168.4.1)
+        if (!repository.isBleTransport()) return
+
         viewModelScope.launch {
             try {
                 repository.getPlayerStatus().fold(

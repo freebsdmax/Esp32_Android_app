@@ -19,6 +19,7 @@ import dagger.hilt.processor.internal.definecomponent.codegen._dagger_hilt_andro
 import dagger.hilt.processor.internal.definecomponent.codegen._dagger_hilt_components_SingletonComponent;
 import hilt_aggregated_deps._com_example_androidplayer_AndroidPlayerApplication_GeneratedInjector;
 import hilt_aggregated_deps._com_example_androidplayer_MainActivity_GeneratedInjector;
+import hilt_aggregated_deps._com_example_androidplayer_di_BleModule;
 import hilt_aggregated_deps._com_example_androidplayer_di_NetworkModuleDi;
 import hilt_aggregated_deps._com_example_androidplayer_di_RepositoryModule;
 import hilt_aggregated_deps._com_example_androidplayer_ui_viewmodel_OtaViewModel_HiltModules_BindsModule;
@@ -72,6 +73,7 @@ import hilt_aggregated_deps._dagger_hilt_android_internal_modules_HiltWrapper_Ac
     aggregatedDeps = {
         _com_example_androidplayer_AndroidPlayerApplication_GeneratedInjector.class,
         _com_example_androidplayer_MainActivity_GeneratedInjector.class,
+        _com_example_androidplayer_di_BleModule.class,
         _com_example_androidplayer_di_NetworkModuleDi.class,
         _com_example_androidplayer_di_RepositoryModule.class,
         _com_example_androidplayer_ui_viewmodel_OtaViewModel_HiltModules_BindsModule.class,
