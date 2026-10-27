@@ -61,27 +61,73 @@ class OtaViewModel @Inject constructor(
      */
     fun loadVersionInfo() {
         viewModelScope.launch {
+            val currentState = _uiState.value
+            var masterPlayer = currentState.masterPlayerVersion
+            var masterWeb = currentState.masterWebVersion
+            var masterUart = currentState.masterUartVersion
+            var slaveMain = currentState.slaveMainVersion
+            var slaveCrc = currentState.slaveCrcVersion
+            var slaveUart = currentState.slaveUartVersion
+
+            // Сначала пробуем получить из /version
             repository.getVersionInfo().fold(
                 onSuccess = { versionInfo ->
-                    _uiState.value = _uiState.value.copy(
-                        masterPlayerVersion = "${versionInfo.player_build_date} ${versionInfo.player_build_time}",
-                        masterWebVersion = "${versionInfo.web_build_date} ${versionInfo.web_build_time}",
-                        masterUartVersion = "${versionInfo.uart_build_date} ${versionInfo.uart_build_time}",
-                        slaveMainVersion = if (versionInfo.slave_main_build_date.isNotEmpty()) 
-                            "${versionInfo.slave_main_build_date} ${versionInfo.slave_main_build_time}" 
-                        else "Не подключен",
-                        slaveCrcVersion = if (versionInfo.slave_crc_build_date.isNotEmpty()) 
-                            "${versionInfo.slave_crc_build_date} ${versionInfo.slave_crc_build_time}" 
-                        else "Не подключен",
-                        slaveUartVersion = if (versionInfo.slave_uart_build_date.isNotEmpty()) 
-                            "${versionInfo.slave_uart_build_date} ${versionInfo.slave_uart_build_time}" 
-                        else "Не подключен"
-                    )
-                    Timber.d("Version info loaded")
+                    masterPlayer = "${versionInfo.player_build_date} ${versionInfo.player_build_time}".trim()
+                    masterWeb = "${versionInfo.web_build_date} ${versionInfo.web_build_time}".trim()
+                    masterUart = "${versionInfo.uart_build_date} ${versionInfo.uart_build_time}".trim()
+
+                    if (versionInfo.slave_main_build_date.isNotEmpty()) {
+                        slaveMain = "${versionInfo.slave_main_build_date} ${versionInfo.slave_main_build_time}".trim()
+                    }
+                    if (versionInfo.slave_crc_build_date.isNotEmpty()) {
+                        slaveCrc = "${versionInfo.slave_crc_build_date} ${versionInfo.slave_crc_build_time}".trim()
+                    }
+                    if (versionInfo.slave_uart_build_date.isNotEmpty()) {
+                        slaveUart = "${versionInfo.slave_uart_build_date} ${versionInfo.slave_uart_build_time}".trim()
+                    }
+                    Timber.d("Version info loaded from /version")
                 },
                 onFailure = { error ->
-                    Timber.e(error, "Failed to load version info")
+                    Timber.e(error, "Failed to load version info from /version")
                 }
+            )
+
+            // Дополнительно мерджим из /ota_status (как в веб-морде)
+            repository.getOtaStatus().fold(
+                onSuccess = { status ->
+                    if (status.player_build_date.isNotEmpty() && status.player_build_time.isNotEmpty()) {
+                        masterPlayer = "${status.player_build_date} ${status.player_build_time}".trim()
+                    }
+                    if (status.web_build_date.isNotEmpty() && status.web_build_time.isNotEmpty()) {
+                        masterWeb = "${status.web_build_date} ${status.web_build_time}".trim()
+                    }
+                    if (status.uart_build_date.isNotEmpty() && status.uart_build_time.isNotEmpty()) {
+                        masterUart = "${status.uart_build_date} ${status.uart_build_time}".trim()
+                    }
+
+                    if (status.slave_main_build_date.isNotEmpty() && status.slave_main_build_time.isNotEmpty()) {
+                        slaveMain = "${status.slave_main_build_date} ${status.slave_main_build_time}".trim()
+                    }
+                    if (status.slave_crc_build_date.isNotEmpty() && status.slave_crc_build_time.isNotEmpty()) {
+                        slaveCrc = "${status.slave_crc_build_date} ${status.slave_crc_build_time}".trim()
+                    }
+                    if (status.slave_uart_build_date.isNotEmpty() && status.slave_uart_build_time.isNotEmpty()) {
+                        slaveUart = "${status.slave_uart_build_date} ${status.slave_uart_build_time}".trim()
+                    }
+                    Timber.d("Version info merged from /ota_status")
+                },
+                onFailure = { error ->
+                    Timber.e(error, "Failed to load version info from /ota_status")
+                }
+            )
+
+            _uiState.value = _uiState.value.copy(
+                masterPlayerVersion = if (masterPlayer.isBlank()) "—" else masterPlayer,
+                masterWebVersion = if (masterWeb.isBlank()) "—" else masterWeb,
+                masterUartVersion = if (masterUart.isBlank()) "—" else masterUart,
+                slaveMainVersion = if (slaveMain.isBlank()) "Не подключен" else slaveMain,
+                slaveCrcVersion = if (slaveCrc.isBlank()) "Не подключен" else slaveCrc,
+                slaveUartVersion = if (slaveUart.isBlank()) "Не подключен" else slaveUart
             )
         }
     }

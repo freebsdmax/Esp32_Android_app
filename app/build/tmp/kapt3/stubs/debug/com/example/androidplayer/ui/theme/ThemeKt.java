@@ -13,7 +13,7 @@ public final class ThemeKt {
     private static final androidx.compose.material3.ColorScheme LightColorScheme = null;
     
     /**
-     * Тема приложения Android для управления ESP32 плеером
+     * Тема приложения Android для управления ESP32 Music Player
      */
     @androidx.compose.runtime.Composable
     public static final void AndroidPlayerTheme(boolean darkTheme, boolean dynamicColor, @org.jetbrains.annotations.NotNull

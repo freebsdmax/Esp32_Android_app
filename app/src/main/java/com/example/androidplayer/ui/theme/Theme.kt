@@ -10,34 +10,67 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// Темная цветовая схема
+// Тёмная цветовая схема
 private val DarkColorScheme = darkColorScheme(
     primary = Esp32Blue,
+    onPrimary = Esp32BlueOnContainer,
+    primaryContainer = Esp32Blue,
+    onPrimaryContainer = Esp32BlueOnContainer,
     secondary = Esp32Green,
+    onSecondary = Esp32GreenOnContainer,
+    secondaryContainer = Esp32GreenContainer,
+    onSecondaryContainer = Esp32GreenOnContainer,
     tertiary = Esp32Orange,
-    background = Color(0xFF121212),
-    surface = Color(0xFF1E1E1E),
-    error = Esp32Red
+    onTertiary = Esp32OrangeOnContainer,
+    tertiaryContainer = Esp32OrangeContainer,
+    onTertiaryContainer = Esp32OrangeOnContainer,
+    background = Esp32DarkBackground,
+    onBackground = Esp32BlueOnContainer,
+    surface = Esp32DarkSurface,
+    onSurface = Esp32BlueOnContainer,
+    surfaceVariant = Esp32DarkSurfaceVariant,
+    onSurfaceVariant = Esp32Grey,
+    outline = Esp32DarkOutline,
+    error = Esp32Red,
+    onError = Esp32RedOnContainer,
+    errorContainer = Esp32RedContainer,
+    onErrorContainer = Esp32RedOnContainer
 )
 
 // Светлая цветовая схема
 private val LightColorScheme = lightColorScheme(
     primary = Esp32Blue,
+    onPrimary = Esp32BlueContainer,
+    primaryContainer = Esp32BlueContainer,
+    onPrimaryContainer = Esp32BlueOnContainer,
     secondary = Esp32Green,
+    onSecondary = Esp32GreenContainer,
+    secondaryContainer = Esp32GreenContainer,
+    onSecondaryContainer = Esp32GreenOnContainer,
     tertiary = Esp32Orange,
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    error = Esp32Red
+    onTertiary = Esp32OrangeContainer,
+    tertiaryContainer = Esp32OrangeContainer,
+    onTertiaryContainer = Esp32OrangeOnContainer,
+    background = Esp32SurfaceSubtle,
+    onBackground = Esp32BlueOnContainer,
+    surface = Esp32SurfaceElevated,
+    onSurface = Esp32BlueOnContainer,
+    surfaceVariant = Esp32SurfaceSubtle,
+    onSurfaceVariant = Esp32Grey,
+    outline = Esp32Grey,
+    error = Esp32Red,
+    onError = Esp32RedContainer,
+    errorContainer = Esp32RedContainer,
+    onErrorContainer = Esp32RedOnContainer
 )
 
 /**
- * Тема приложения Android для управления ESP32 плеером
+ * Тема приложения Android для управления ESP32 Music Player
  */
 @Composable
 fun AndroidPlayerTheme(
@@ -54,13 +87,15 @@ fun AndroidPlayerTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
-    
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+            window.statusBarColor = colorScheme.surface.toArgb()
+            window.navigationBarColor = colorScheme.surface.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
         }
     }
 

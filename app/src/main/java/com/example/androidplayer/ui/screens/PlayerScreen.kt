@@ -1,23 +1,71 @@
 package com.example.androidplayer.ui.screens
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidplayer.ui.viewmodel.PlayerUiState
 import com.example.androidplayer.ui.viewmodel.PlayerViewModel
-import timber.log.Timber
+import kotlinx.coroutines.delay
 
 /**
  * Главный экран управления плеером
@@ -30,112 +78,228 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
-    
-    // Автообновление позиции — делаем тихий опрос через ViewModel
-    LaunchedEffect(uiState.currentTrack, uiState.durationMs) {
+
+    // Автообновление позиции через тихий опрос
+    LaunchedEffect(uiState.currentTrack) {
         while (true) {
-            kotlinx.coroutines.delay(1000)
+            delay(1000)
             viewModel.pollPlayerStatus()
         }
     }
-    
-    Column(
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Заголовок
-        Text(
-            text = "🎵 ESP32 Music Player",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        // Статус плеера
-        PlayerStatusCard(
-            uiState = uiState,
-            isLoading = isLoading
-        )
-        
-        // Элементы управления
-        PlayerControls(
-            uiState = uiState,
-            onPlayPause = { viewModel.togglePlayback() },
-            onNext = { viewModel.nextTrack() },
-            onPrevious = { viewModel.previousTrack() },
-            onSwitchMode = { viewModel.switchMode() },
-            onToggleSniffer = { viewModel.toggleSniffer() }
-        )
-        
-        // Позиция воспроизведения
-        PlaybackPosition(
-            uiState = uiState,
-            onPositionChange = { position -> viewModel.setPosition(position) }
-        )
-        
-        // Плейлист
-        PlaylistSection(
-            uiState = uiState,
-            onTrackSelect = { trackIndex -> viewModel.playTrack(trackIndex) }
-        )
-        
-        // Обработка ошибок
-        error?.let { errorMessage ->
-            ErrorCard(
-                message = errorMessage,
-                onDismiss = { viewModel.clearError() }
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "ESP32 Music Player",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
+            Text(
+                text = "Управление плеером и CAN-Sniffer",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        item {
+            NowPlayingCard(
+                uiState = uiState,
+                isLoading = isLoading
+            )
+        }
+
+        item {
+            PlayerControls(
+                uiState = uiState,
+                onPlayPause = { viewModel.togglePlayback() },
+                onNext = { viewModel.nextTrack() },
+                onPrevious = { viewModel.previousTrack() },
+                onSwitchMode = { viewModel.switchMode() },
+                onToggleSniffer = { viewModel.toggleSniffer() }
+            )
+        }
+
+        item {
+            PlaybackPosition(
+                uiState = uiState,
+                onPositionChange = { position -> viewModel.setPosition(position) }
+            )
+        }
+
+        if (uiState.playlist.isNotEmpty()) {
+            item {
+                PlaylistSection(
+                    uiState = uiState,
+                    onTrackSelect = { trackIndex -> viewModel.playTrack(trackIndex) }
+                )
+            }
+        }
+
+        error?.let { errorMessage ->
+            item {
+                ErrorCard(
+                    message = errorMessage,
+                    onDismiss = { viewModel.clearError() }
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
 /**
- * Карточка статуса плеера
+ * Карточка "Сейчас играет"
  */
 @Composable
-private fun PlayerStatusCard(
+private fun NowPlayingCard(
     uiState: PlayerUiState,
     isLoading: Boolean
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            if (isLoading) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                        )
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Загрузка...")
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (isLoading) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Загрузка...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = if (uiState.playlist.isNotEmpty() && uiState.currentTrack < uiState.playlist.size) {
+                                    uiState.playlist[uiState.currentTrack]
+                                } else {
+                                    "Трек ${uiState.currentTrack + 1}"
+                                },
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Трек ${uiState.currentTrack + 1} из ${if (uiState.playlistSize == 0) "—" else uiState.playlistSize}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
                 }
-            } else {
-                Text(
-                    text = "Трек ${uiState.currentTrack + 1} из ${uiState.playlistSize}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Режим: ${uiState.mode}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "Wi-Fi CAN-Sniffer: ${if (uiState.snifferEnabled) "Включен" else "Выключен"}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StatusChip(
+                        text = "Режим: ${uiState.mode}",
+                        icon = Icons.Default.SwapHoriz
+                    )
+                    StatusChip(
+                        text = if (uiState.snifferEnabled) "CAN-Sniffer: Вкл" else "CAN-Sniffer: Выкл",
+                        icon = Icons.Default.Radio,
+                        highlighted = uiState.snifferEnabled
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun StatusChip(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    highlighted: Boolean = false
+) {
+    val containerColor = if (highlighted) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+    } else {
+        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f)
+    }
+    val contentColor = if (highlighted) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    }
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(containerColor)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = contentColor
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = contentColor
+        )
     }
 }
 
@@ -152,48 +316,80 @@ private fun PlayerControls(
     onToggleSniffer: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Управление",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            
-            // Основные кнопки управления
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GraphicEq,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Управление",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
+                FilledIconButton(
                     onClick = onPrevious,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(56.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 ) {
                     Icon(
                         Icons.Default.SkipPrevious,
                         contentDescription = "Предыдущий трек"
                     )
                 }
-                
-                FloatingActionButton(
+
+                FilledIconButton(
                     onClick = onPlayPause,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        if (uiState.isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                        contentDescription = if (uiState.isPaused) "Воспроизвести" else "Пауза"
+                    modifier = Modifier.size(72.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
+                ) {
+                    AnimatedContent(
+                        targetState = uiState.isPaused,
+                        transitionSpec = { fadeIn().togetherWith(fadeOut()) },
+                        label = "play_pause_icon"
+                    ) { isPaused ->
+                        Icon(
+                            imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                            contentDescription = if (isPaused) "Воспроизвести" else "Пауза",
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
                 }
-                
-                IconButton(
+
+                FilledIconButton(
                     onClick = onNext,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(56.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 ) {
                     Icon(
                         Icons.Default.SkipNext,
@@ -201,37 +397,41 @@ private fun PlayerControls(
                     )
                 }
             }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Дополнительные кнопки
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(
+                OutlinedButton(
                     onClick = onSwitchMode,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(Icons.Default.SwapHoriz, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Режим")
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Переключить режим")
                 }
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
+
                 Button(
                     onClick = onToggleSniffer,
                     modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (uiState.snifferEnabled) 
-                            MaterialTheme.colorScheme.primary else 
-                            MaterialTheme.colorScheme.secondary
+                        containerColor = if (uiState.snifferEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        contentColor = if (uiState.snifferEnabled) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
                     )
                 ) {
                     Icon(Icons.Default.Radio, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("CAN-Sniffer")
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (uiState.snifferEnabled) "Снiffer Вкл" else "CAN-Sniffer")
                 }
             }
         }
@@ -248,27 +448,35 @@ private fun PlaybackPosition(
 ) {
     if (uiState.durationMs > 0) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "Позиция",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Interactive seek slider with user-interaction guard
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.GraphicEq,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Прогресс воспроизведения",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
                 var isSeeking by remember { mutableStateOf(false) }
                 var sliderPosition by remember { mutableStateOf(0f) }
 
-                // Update slider position from uiState when user is not interacting
                 LaunchedEffect(uiState.positionMs, uiState.durationMs) {
                     if (!isSeeking && uiState.durationMs > 0) {
                         sliderPosition = uiState.positionMs.toFloat() / uiState.durationMs
@@ -282,7 +490,6 @@ private fun PlaybackPosition(
                         isSeeking = true
                     },
                     onValueChangeFinished = {
-                        // Convert slider value back to milliseconds and request seek
                         val newMs = (sliderPosition * uiState.durationMs).toInt()
                         onPositionChange(newMs)
                         isSeeking = false
@@ -290,15 +497,21 @@ private fun PlaybackPosition(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     val displayMs = if (isSeeking) (sliderPosition * uiState.durationMs).toInt() else uiState.positionMs
-                    Text(formatTime(displayMs))
-                    Text(formatTime(uiState.durationMs))
+                    Text(
+                        text = formatTime(displayMs),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formatTime(uiState.durationMs),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -313,38 +526,62 @@ private fun PlaylistSection(
     uiState: PlayerUiState,
     onTrackSelect: (Int) -> Unit
 ) {
-    if (uiState.playlist.isNotEmpty()) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Плейлист (${uiState.playlist.size} треков)",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                
-                val listState = rememberLazyListState()
-                
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.height(200.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    itemsIndexed(uiState.playlist) { index, track ->
-                        TrackItem(
-                            trackName = track,
-                            isPlaying = index == uiState.currentTrack,
-                            onClick = { onTrackSelect(index) }
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Плейлист",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Text(
+                    text = "${uiState.playlist.size} треков",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            val listState = rememberLazyListState()
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.height(220.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                itemsIndexed(uiState.playlist) { index, track ->
+                    TrackItem(
+                        trackName = track,
+                        isPlaying = index == uiState.currentTrack,
+                        onClick = { onTrackSelect(index) }
+                    )
+
+                    if (index < uiState.playlist.size - 1) {
+                        Divider(
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                         )
-                        
-                        if (index < uiState.playlist.size - 1) {
-                            Divider()
-                        }
                     }
                 }
             }
@@ -364,37 +601,53 @@ private fun TrackItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (isPlaying) {
-            Icon(
-                Icons.Default.VolumeUp,
-                contentDescription = "Воспроизводится",
-                tint = MaterialTheme.colorScheme.primary
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Default.VolumeUp else Icons.Default.MusicNote,
+                contentDescription = null,
+                tint = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
         }
-        
+
         Text(
             text = trackName,
             modifier = Modifier.weight(1f),
             style = if (isPlaying) {
-                MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
             } else {
-                MaterialTheme.typography.bodyMedium
+                MaterialTheme.typography.bodyLarge
             },
             color = if (isPlaying) {
                 MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.onSurface
-            }
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
-        
+
         IconButton(onClick = onClick) {
             Icon(
-                Icons.Default.PlayArrow,
-                contentDescription = "Воспроизвести"
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Воспроизвести трек",
+                tint = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -409,26 +662,26 @@ private fun ErrorCard(
     onDismiss: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer
         )
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Icon(
                 Icons.Default.Error,
-                contentDescription = "Ошибка",
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.onErrorContainer
             )
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = message,
                 modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             IconButton(onClick = onDismiss) {
@@ -446,8 +699,8 @@ private fun ErrorCard(
  * Форматирование времени в миллисекундах
  */
 private fun formatTime(milliseconds: Int): String {
-    val seconds = milliseconds / 1000
-    val minutes = seconds / 60
-    val remainingSeconds = seconds % 60
+    val totalSeconds = milliseconds / 1000
+    val minutes = totalSeconds / 60
+    val remainingSeconds = totalSeconds % 60
     return "%d:%02d".format(minutes, remainingSeconds)
 }
