@@ -1,87 +1,83 @@
-# ESP32 Music Player Control (Android App)
+# ESP32 Music Player Control (Android-додаток)
 
-Android-приложение для управления MP3-плеером на базе ESP32 (проект **Ford-DensO-mp3**).
+Android-додаток для керування MP3-плеєром на базі ESP32 (проєкт **Ford-DensO-mp3**).
 
-## Возможности
+## Можливості
 
-- **Плеер** — управление воспроизведением (play/pause/next/prev), переключение треков из плейлиста, перемотка по таймлайну.
-- **Режимы** — переключение между режимом USB/носителя и внешним I2S-входом.
-- **CAN-Sniffer** — включение/выключение Wi-Fi CAN-Sniffer с отображением состояния.
-- **Wi-Fi** — настройка подключения ESP32 в режимах AP/STA, сохранение SSID/пароля.
-- **OTA обновления** — обновление прошивки Master ESP32 и Slave ESP32 через UART по блокам.
-- **Системный монитор** — информация о системе, статистика CAN, просмотр и управление логами.
-- **BLE** — поддержка подключения по BLE (при наличии на устройстве).
+- **Плеєр** — керування відтворенням (play/pause/наступний/попередній), вибір треку з плейлиста, перемотка по треку.
+- **Режими** — перемикання між режимом USB/носія та зовнішнім I2S-входом.
+- **CAN-Sniffer** — увімкнення/вимкнення Wi-Fi CAN-Sniffer із відображенням стану.
+- **Wi-Fi** — налаштування підключення ESP32 у режимах AP/STA, збереження SSID та пароля.
+- **OTA-оновлення** — оновлення прошивки Master ESP32 та Slave ESP32 через UART блоками по 240 байт.
+- **Системний монітор** — інформація про систему, статистика CAN, перегляд та керування логами.
+- **BLE** — підтримка підключення по BLE (за наявності на пристрої).
 
-## Скриншоты
-
-*Скриншоты будут добавлены позже.*
-
-## Технологии
+## Технології
 
 - **Kotlin** + **Jetpack Compose** (Material 3)
-- **Hilt** — внедрение зависимостей
-- **Retrofit/OkHttp** — работа по HTTP
-- **Coroutines/Flow** — асинхронщина
-- **Navigation Compose** — навигация
-- **Timber** — логирование
-- **BLE** (Android Bluetooth API) — для подключения по BLE
+- **Hilt** — впровадження залежностей
+- **Retrofit/OkHttp** — робота по HTTP
+- **Coroutines/Flow** — асинхронна робота
+- **Navigation Compose** — навігація
+- **Timber** — логування
+- **BLE** (Android Bluetooth API) — підключення по BLE
 
-## Сборка
+## Збірка
 
-### Требования
+### Вимоги
 
-- **Android Studio** (рекомендуется последняя стабильная) или **Android SDK Command Line Tools**
+- **Android Studio** (рекомендовано останню стабільну версію) або **Android SDK Command Line Tools**
 - **JDK 17**
 - **Android SDK** (compileSdk 34, minSdk 26)
 
-### Сборка через Android Studio
+### Збірка через Android Studio
 
-1. Открыть `D:\emulators\Ford-DensO-mp3-master\AndroidPlayer` в Android Studio.
-2. Дождаться синхронизации Gradle.
-3. `Build > Build Bundle(s) / APK(s) > Build APK(s)` или `Run` на устройстве/эмуляторе.
+1. Відкрити `D:\emulators\Ford-DensO-mp3-master\AndroidPlayer` в Android Studio.
+2. Дочекатись синхронізації Gradle.
+3. `Build > Build Bundle(s) / APK(s) > Build APK(s)` або запустити `Run` на пристрої/емуляторі.
 
-### Сборка через консоль
+### Збірка через консоль
 
 ```bash
 cd D:\emulators\Ford-DensO-mp3-master\AndroidPlayer
-./gradlew.bat assembleDebug
-# или
-./gradlew.bat installDebug
+.\gradlew.bat assembleDebug
+# або
+.\gradlew.bat installDebug
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`
+Готовий APK: `app/build/outputs/apk/debug/app-debug.apk`
 
-### Настройка SDK (при необходимости)
+### Налаштування SDK (за потреби)
 
-Создай `local.properties` в корне модуля `AndroidPlayer/`:
+Створи файл `local.properties` в корені модуля `AndroidPlayer/`:
 
 ```properties
-sdk.dir=C:\\Users\\<ИмяПользователя>\\AppData\\Local\\Android\\Sdk
+sdk.dir=C:\\Users\\<Ім'яКористувача>\\AppData\\Local\\Android\\Sdk
 ```
 
-## Подключение к устройству
+## Підключення до пристрою
 
-1. Подключи телефон к той же Wi-Fi-сети, что и ESP32, или подключись к AP ESP32 (`ESP32-MusicPlayer` по умолчанию).
-2. В приложении в **Настройках** можно поменять IP-адрес ESP32 (по умолчtip http://192.168.4.1).
-3. Либо используй **BLE** для подключения к устройству.
+1. Підключи телефон до тієї ж Wi-Fi-мережі, що й ESP32, або підключись до AP ESP32 (за замовчуванням `ESP32-MusicPlayer`).
+2. У додатку в розділі **Налаштування** можна змінити IP-адресу ESP32 (за замовчуванням `http://192.168.4.1`).
+3. Також можна використати **BLE** для підключення до пристрою.
 
-## Структура проекта
+## Структура проєкту
 
 ```text
 AndroidPlayer/
 ├── app/src/main/java/com/example/androidplayer/
-│   ├── data/        # Модели, сеть, репозиторий, BLE
-│   ├── di/          # Hilt-модули
-│   ├── ui/          # Compose-экраны, темы, навигация, ViewModel
+│   ├── data/        # Моделі, мережа, репозиторій, BLE
+│   ├── di/          # Hilt-модулі
+│   ├── ui/          # Compose-екрани, теми, навігація, ViewModel
 │   └── MainActivity.kt
 └── app/build.gradle
 ```
 
-## Версия
+## Версія
 
 - **App versionName:** 1.0.0
 - **App versionCode:** 1
 
-## Лицензия
+## Ліцензія
 
-Проект предназначен для личного использования. Авторские права на оригинальный проект см. в корневом репозитории **Ford-DensO-mp3**.
+Проєкт призначений для особистого використання. Авторські права на оригінальний проєкт дивись у кореневому репозиторії **Ford-DensO-mp3**.
