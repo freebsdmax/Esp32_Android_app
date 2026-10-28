@@ -283,23 +283,23 @@ private fun UpdateRow(
     onAction: () -> Unit,
     upToDateText: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium)
-                Text(
-                    text = if (latest != null && available) "$current  →  $latest" else "$current  ·  $upToDateText",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (available) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (available) {
-                Button(onClick = onAction, enabled = enabled,
-                    shape = MaterialTheme.shapes.medium) {
-                    Text(actionText, style = MaterialTheme.typography.labelLarge)
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium)
+        Text(
+            text = if (latest != null && available) "$current  →  $latest" else "$current  ·  $upToDateText",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (available) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (available) {
+            Button(
+                onClick = onAction,
+                enabled = enabled,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(actionText, style = MaterialTheme.typography.labelLarge)
             }
         }
     }
