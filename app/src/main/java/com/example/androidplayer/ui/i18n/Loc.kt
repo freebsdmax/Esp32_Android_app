@@ -256,6 +256,39 @@ object Loc {
     fun notifTitleFallback(): String = "Ford Player"
     fun trackTitle(n: Int): String = if (isUkrainian) "Трек $n" else "Track $n"
 
+    // ---- in-app updates ----
+    fun updTitle(): String = if (isUkrainian) "Оновлення" else "Updates"
+    fun updSubtitle(): String = if (isUkrainian) "Застосунок і прошивка Master" else "App and Master firmware"
+    fun updApp(): String = if (isUkrainian) "Застосунок" else "Application"
+    fun updFirmware(): String = if (isUkrainian) "Прошивка Master" else "Master firmware"
+    fun updCheck(): String = if (isUkrainian) "Перевірити" else "Check"
+    fun updInstall(): String = if (isUkrainian) "Завантажити і встановити" else "Download & install"
+    fun updFlash(): String = if (isUkrainian) "Завантажити і прошити" else "Download & flash"
+    fun updUpToDate(): String = if (isUkrainian) "Актуально" else "Up to date"
+    fun updNoConnection(): String = if (isUkrainian) "Немає з'єднання" else "Not connected"
+    fun updChecking(): String = if (isUkrainian) "Перевірка…" else "Checking…"
+    fun updNewAvailable(): String = if (isUkrainian) "Доступне оновлення" else "Update available"
+    fun updateErrorCheck(): String =
+        if (isUkrainian) "Не вдалося перевірити релізи на GitHub" else "Could not check GitHub releases"
+    fun updateErrorNoApk(): String =
+        if (isUkrainian) "У релізі немає APK" else "The release has no APK"
+    fun updateErrorNoBin(): String =
+        if (isUkrainian) "У релізі немає образу прошивки" else "The release has no firmware image"
+    fun updateDownloading(name: String): String =
+        if (isUkrainian) "Завантаження $name…" else "Downloading $name…"
+    fun updateInstalling(): String =
+        if (isUkrainian) "Відкриваю інсталятор…" else "Opening the installer…"
+    fun updateFlashing(): String =
+        if (isUkrainian) "Прошиваю Master по BLE…" else "Flashing Master over BLE…"
+    fun updateFlashingPercent(percent: Int): String =
+        if (isUkrainian) "Прошивання: $percent%" else "Flashing: $percent%"
+    fun updateFlashed(): String =
+        if (isUkrainian) "Прошивку оновлено, пристрій перезавантажується" else "Firmware updated, device is restarting"
+    fun updateErrorDownload(detail: String): String =
+        if (isUkrainian) "Помилка завантаження: $detail" else "Download failed: $detail"
+    fun updateErrorFlash(detail: String): String =
+        if (isUkrainian) "Помилка прошивання: $detail" else "Flashing failed: $detail"
+
     fun logGroupsTitle(): String =
         if (isUkrainian) "Логи за модулями:" else "Logs by module:"
     fun logGroupPlayer(): String =
