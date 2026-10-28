@@ -281,6 +281,15 @@ object Loc {
     fun updateFromCache(): String =
         if (isUkrainian) "Показано збережені дані (GitHub зараз недоступний)"
         else "Showing cached data (GitHub is unavailable right now)"
+
+    fun fwManualTitle(): String = if (isUkrainian) "Прошивка вручну" else "Manual firmware"
+    fun fwManualSubtitle(): String =
+        if (isUkrainian) "Файл .bin з телефона" else ".bin file from the phone"
+    fun fwManualHint(): String =
+        if (isUkrainian) "Не через GitHub. Master перезавантажиться, Slave отримає образ по UART."
+        else "Not via GitHub. Master reboots, Slave is flashed over UART."
+    fun fwManualMaster(): String = if (isUkrainian) "Master (цей пристрій)" else "Master (this device)"
+    fun fwManualSlave(): String = if (isUkrainian) "Slave (Bluetooth-модуль)" else "Slave (Bluetooth module)"
     fun updateErrorNoApk(): String =
         if (isUkrainian) "У релізі немає APK" else "The release has no APK"
     fun updateErrorNoBin(): String =

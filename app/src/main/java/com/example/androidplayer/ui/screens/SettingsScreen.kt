@@ -1,5 +1,14 @@
 package com.example.androidplayer.ui.screens
 
+import java.io.File
+import com.example.androidplayer.ui.viewmodel.OtaViewModel
+import com.example.androidplayer.ui.viewmodel.OtaUiState
+import com.example.androidplayer.ui.components.CardHeader
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.Upload
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.net.Uri
 import com.example.androidplayer.ui.i18n.Loc
 import com.example.androidplayer.ui.i18n.tr
 
@@ -12,10 +21,8 @@ import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,9 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidplayer.data.ble.BlePlayerClient
-import com.example.androidplayer.data.model.VersionCompare
 import com.example.androidplayer.ui.viewmodel.SettingsViewModel
-import com.example.androidplayer.ui.viewmodel.UpdateViewModel
 import androidx.compose.ui.graphics.Color
 import com.example.androidplayer.ui.notify.AppNotify
 
@@ -43,11 +48,42 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val connected by ble.isConnected.collectAsStateWithLifecycle()
-    val updateViewModel: UpdateViewModel = hiltViewModel()
-    val updateState by updateViewModel.uiState.collectAsStateWithLifecycle()
+    val otaViewModel: OtaViewModel = hiltViewModel()
+    val otaState by otaViewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.saveMessage) {
         uiState.saveMessage?.let { AppNotify.info(it) }
+    }
+    LaunchedEffect(otaState.uploadMessage) {
+        otaState.uploadMessage?.let { AppNotify.info(it); otaViewModel.clearUploadMessage() }
+    }
+    LaunchedEffect(otaState.errorMessage) {
+        otaState.errorMessage?.let { AppNotify.error(it) }
+    }
+
+    // Ручне прошивання: вибір .bin з телефона
+    val masterPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            context.contentResolver.openInputStream(it)?.use { input ->
+                val temp = File(context.cacheDir, "firmware_ble_${System.currentTimeMillis()}.bin")
+                temp.outputStream().use { out -> input.copyTo(out) }
+                otaViewModel.uploadMasterFirmwareBle(temp)
+            }
+        }
+    }
+    val slavePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            context.contentResolver.openInputStream(it)?.use { input ->
+                val temp = File(context.cacheDir, "slave_ble_${System.currentTimeMillis()}.bin")
+                temp.outputStream().use { out -> input.copyTo(out) }
+                otaViewModel.uploadSlaveFirmwareBle(temp)
+            }
+        }
     }
 
     LazyColumn(
@@ -55,12 +91,6 @@ fun SettingsScreen(
         contentPadding = PaddingValues(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            UpdatesCard(state = updateState, onCheck = { updateViewModel.checkForUpdates(force = true) },
-                onInstallApp = { updateViewModel.downloadAndInstallApp() },
-                onFlashFirmware = { updateViewModel.downloadAndFlashFirmware() },
-                onFlashSlave = { updateViewModel.downloadAndFlashSlave() })
-        }
         item {
             BleConnectionCard(
                 connected = connected,
@@ -86,7 +116,13 @@ fun SettingsScreen(
                 onSave = { viewModel.saveSleepSettings() }
             )
         }
-        item { AboutCard() }
+        item {
+            ManualFirmwareCard(
+                state = otaState,
+                onPickMaster = { masterPicker.launch("application/octet-stream") },
+                onPickSlave = { slavePicker.launch("application/octet-stream") }
+            )
+        }
         if (uiState.isSaved && uiState.saveMessage != null) {
             item { SavedBanner(uiState.saveMessage!!) }
         }
@@ -202,121 +238,6 @@ private fun AppearanceCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun UpdatesCard(
-    state: UpdateViewModel.UpdateUiState,
-    onCheck: () -> Unit,
-    onInstallApp: () -> Unit,
-    onFlashFirmware: () -> Unit,
-    onFlashSlave: () -> Unit
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SectionHeader(
-                    icon = Icons.Default.SystemUpdate,
-                    title = Loc.updTitle(),
-                    subtitle = Loc.updSubtitle()
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = onCheck, enabled = !state.checking && !state.busy) {
-                    if (state.checking) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.Refresh, contentDescription = Loc.updCheck())
-                    }
-                }
-            }
-
-            UpdateRow(
-                label = Loc.updApp(),
-                current = VersionCompare.short(state.appCurrent),
-                latest = state.appLatest?.let { VersionCompare.short(it) },
-                available = state.appUpdate,
-                actionText = Loc.updInstall(),
-                enabled = state.appUpdate && !state.busy,
-                onAction = onInstallApp,
-                upToDateText = Loc.updUpToDate()
-            )
-
-            UpdateRow(
-                label = Loc.updSlave(),
-                current = VersionCompare.short(state.slaveCurrent),
-                latest = state.slaveLatest?.let { VersionCompare.short(it) },
-                available = state.slaveUpdate,
-                actionText = if (state.connected) Loc.updFlash() else Loc.updNoConnection(),
-                enabled = state.slaveUpdate && state.connected && !state.busy,
-                onAction = onFlashSlave,
-                upToDateText = if (state.connected) Loc.updUpToDate() else Loc.updNoConnection()
-            )
-
-            UpdateRow(
-                label = Loc.updFirmware(),
-                current = VersionCompare.short(state.fwCurrent),
-                latest = state.fwLatest?.let { VersionCompare.short(it) },
-                available = state.fwUpdate,
-                actionText = if (state.connected) Loc.updFlash() else Loc.updNoConnection(),
-                enabled = state.fwUpdate && state.connected && !state.busy,
-                onAction = onFlashFirmware,
-                upToDateText = if (state.connected) Loc.updUpToDate() else Loc.updNoConnection()
-            )
-
-            if (state.busy) {
-                LinearProgressIndicator(
-                    progress = state.progress / 100f,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            state.status?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary)
-            }
-            state.error?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error)
-            }
-        }
-    }
-}
-
-@Composable
-private fun UpdateRow(
-    label: String,
-    current: String,
-    latest: String?,
-    available: Boolean,
-    actionText: String,
-    enabled: Boolean,
-    onAction: () -> Unit,
-    upToDateText: String
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium)
-        Text(
-            text = if (latest != null && available) "$current  →  $latest" else "$current  ·  $upToDateText",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (available) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (available) {
-            Button(
-                onClick = onAction,
-                enabled = enabled,
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(actionText, style = MaterialTheme.typography.labelLarge)
-            }
-        }
-    }
-}
-
 @Composable
 private fun SleepCard(
     sleepMode: Int,
@@ -379,24 +300,79 @@ private fun SleepCard(
 }
 
 @Composable
-private fun AboutCard() {
+private fun ManualFirmwareCard(
+    state: OtaUiState,
+    onPickMaster: () -> Unit,
+    onPickSlave: () -> Unit
+) {
+    val uploading = state.isUploading
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            SectionHeader(
-                icon = Icons.Default.Info,
-                title = tr("Про Ford Player"),
-                subtitle = "Ford Player"
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            CardHeader(
+                icon = Icons.Default.Upload,
+                title = Loc.fwManualTitle(),
+                subtitle = Loc.fwManualSubtitle()
             )
-            Text(tr("Версія 1.0.0"), style = MaterialTheme.typography.bodyMedium)
             Text(
-                tr("Керування Ford Player через Bluetooth: плеєр, плейлист, OTA та моніторинг."),
+                Loc.fwManualHint(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Button(
+                onClick = onPickMaster,
+                enabled = !uploading,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Text(Loc.fwManualMaster())
+            }
+            OutlinedButton(
+                onClick = onPickSlave,
+                enabled = !uploading,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Text(Loc.fwManualSlave())
+            }
+            if (uploading) {
+                LinearProgressIndicator(
+                    progress = state.uploadProgress,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${(state.uploadProgress * 100).toInt()}%  " +
+                            Loc.otaPhaseName(state.uploadPhaseApply),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (state.uploadBytesPerSec > 0) {
+                        Text(
+                            text = Loc.speedText(state.uploadBytesPerSec),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+                if (state.uploadEtaSeconds >= 0) {
+                    Text(
+                        text = Loc.etaText(state.uploadEtaSeconds),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            state.uploadMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary)
+            }
+            state.errorMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }
