@@ -261,6 +261,7 @@ object Loc {
     fun updSubtitle(): String = if (isUkrainian) "Застосунок і прошивка Master" else "App and Master firmware"
     fun updApp(): String = if (isUkrainian) "Застосунок" else "Application"
     fun updFirmware(): String = if (isUkrainian) "Прошивка Master" else "Master firmware"
+    fun updSlave(): String = if (isUkrainian) "Прошивка Slave" else "Slave firmware"
     fun updCheck(): String = if (isUkrainian) "Перевірити" else "Check"
     fun updInstall(): String = if (isUkrainian) "Завантажити і встановити" else "Download & install"
     fun updFlash(): String = if (isUkrainian) "Завантажити і прошити" else "Download & flash"
@@ -282,6 +283,8 @@ object Loc {
         if (isUkrainian) "Прошиваю Master по BLE…" else "Flashing Master over BLE…"
     fun updateFlashingPercent(percent: Int): String =
         if (isUkrainian) "Прошивання: $percent%" else "Flashing: $percent%"
+    fun updateFlashedSlave(): String =
+        if (isUkrainian) "Прошивку Slave оновлено по UART" else "Slave firmware updated over UART"
     fun updateFlashed(): String =
         if (isUkrainian) "Прошивку оновлено, пристрій перезавантажується" else "Firmware updated, device is restarting"
     fun updateErrorDownload(detail: String): String =

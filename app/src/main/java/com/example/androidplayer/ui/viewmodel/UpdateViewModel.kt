@@ -39,6 +39,9 @@ class UpdateViewModel @Inject constructor(
         val fwNotes: String? = null,
         val appUpdate: Boolean = false,
         val fwUpdate: Boolean = false,
+        val slaveCurrent: String? = null,
+        val slaveLatest: String? = null,
+        val slaveUpdate: Boolean = false,
         val busy: Boolean = false,
         val progress: Int = 0,
         val status: String? = null,
@@ -51,6 +54,7 @@ class UpdateViewModel @Inject constructor(
 
     private var appRelease: ReleaseInfo? = null
     private var fwRelease: ReleaseInfo? = null
+    private var slaveRelease: ReleaseInfo? = null
 
     init {
         viewModelScope.launch {
@@ -68,13 +72,22 @@ class UpdateViewModel @Inject constructor(
 
             val app = github.latestRelease(APP_REPO)
             val fw = github.latestRelease(FW_REPO)
+            val slave = github.latestRelease(SLAVE_REPO)
             appRelease = app
             fwRelease = fw
+            slaveRelease = slave
 
             // версія прошивки береться з самого пристрою
             val deviceFw = runCatching {
                 if (bleClient.isConnected.value) repository.getSystemInfo().getOrThrow().firmwareVersion
                 else null
+            }.getOrNull()
+
+            val slaveFw = runCatching {
+                if (bleClient.isConnected.value) {
+                    repository.getVersionInfo().getOrThrow().slave_fw_version
+                        .takeIf { it.isNotBlank() && it != "unknown" }
+                } else null
             }.getOrNull()
 
             val appCurrent = BuildConfig.VERSION_NAME
@@ -91,10 +104,13 @@ class UpdateViewModel @Inject constructor(
                 appNotes = app?.notes,
                 fwNotes = fw?.notes,
                 appUpdate = VersionCompare.isNewer(appLatest, appCurrent),
-                fwUpdate = VersionCompare.isNewer(fwLatest, fwCurrent)
+                fwUpdate = VersionCompare.isNewer(fwLatest, fwCurrent),
+                slaveCurrent = slaveFw,
+                slaveLatest = slave?.tag,
+                slaveUpdate = VersionCompare.isNewer(slave?.tag, slaveFw)
             )
 
-            if (app == null && fw == null) {
+            if (app == null && fw == null && slave == null) {
                 _uiState.value = _uiState.value.copy(
                     error = Loc.updateErrorCheck()
                 )
@@ -209,6 +225,63 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
+    /** Завантажити образ Slave і прошити його через Master (BLE -> UART). */
+    fun downloadAndFlashSlave() {
+        val release = slaveRelease ?: return
+        val asset = release.asset(listOf(".bin"), exclude = listOf("-full", "bootloader", "partition", "ota_data"))
+            ?: run {
+                _uiState.value = _uiState.value.copy(error = Loc.updateErrorNoBin())
+                return
+            }
+        if (_uiState.value.busy) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                busy = true, progress = 0, error = null,
+                status = Loc.updateDownloading(asset.name)
+            )
+            try {
+                val file = File(context.cacheDir, "updates/${asset.name}")
+                github.download(asset.url, file) { percent ->
+                    _uiState.value = _uiState.value.copy(progress = percent / 3)
+                }
+
+                _uiState.value = _uiState.value.copy(status = Loc.updateFlashing())
+                val bytes = file.readBytes()
+
+                repository.bleFileOtaUpdate(bytes, "slave") { transfer ->
+                    val overall = 33 + (transfer.percent * 67 / 100)
+                    _uiState.value = _uiState.value.copy(
+                        progress = overall,
+                        status = Loc.updateFlashingPercent(transfer.percent)
+                    )
+                }.fold(
+                    onSuccess = {
+                        _uiState.value = _uiState.value.copy(
+                            busy = false,
+                            progress = 100,
+                            status = Loc.updateFlashedSlave(),
+                            slaveUpdate = false,
+                            slaveCurrent = _uiState.value.slaveLatest
+                        )
+                    },
+                    onFailure = { error ->
+                        _uiState.value = _uiState.value.copy(
+                            busy = false,
+                            error = Loc.updateErrorFlash(error.message ?: "unknown")
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "Slave firmware download failed")
+                _uiState.value = _uiState.value.copy(
+                    busy = false,
+                    error = Loc.updateErrorDownload(e.message ?: "unknown")
+                )
+            }
+        }
+    }
+
     fun clearMessages() {
         _uiState.value = _uiState.value.copy(error = null, status = null)
     }
@@ -216,5 +289,6 @@ class UpdateViewModel @Inject constructor(
     companion object {
         const val APP_REPO = "freebsdmax/Esp32_Android_app"
         const val FW_REPO = "freebsdmax/Ford-DensO-mp3-master"
+        const val SLAVE_REPO = "freebsdmax/Ford-DensO-bluetooth-slave"
     }
 }

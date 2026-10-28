@@ -57,7 +57,8 @@ fun SettingsScreen(
         item {
             UpdatesCard(state = updateState, onCheck = { updateViewModel.checkForUpdates() },
                 onInstallApp = { updateViewModel.downloadAndInstallApp() },
-                onFlashFirmware = { updateViewModel.downloadAndFlashFirmware() })
+                onFlashFirmware = { updateViewModel.downloadAndFlashFirmware() },
+                onFlashSlave = { updateViewModel.downloadAndFlashSlave() })
         }
         item {
             BleConnectionCard(
@@ -195,7 +196,8 @@ private fun UpdatesCard(
     state: UpdateViewModel.UpdateUiState,
     onCheck: () -> Unit,
     onInstallApp: () -> Unit,
-    onFlashFirmware: () -> Unit
+    onFlashFirmware: () -> Unit,
+    onFlashSlave: () -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -227,6 +229,17 @@ private fun UpdatesCard(
                 enabled = state.appUpdate && !state.busy,
                 onAction = onInstallApp,
                 upToDateText = Loc.updUpToDate()
+            )
+
+            UpdateRow(
+                label = Loc.updSlave(),
+                current = VersionCompare.short(state.slaveCurrent),
+                latest = state.slaveLatest?.let { VersionCompare.short(it) },
+                available = state.slaveUpdate,
+                actionText = if (state.connected) Loc.updFlash() else Loc.updNoConnection(),
+                enabled = state.slaveUpdate && state.connected && !state.busy,
+                onAction = onFlashSlave,
+                upToDateText = if (state.connected) Loc.updUpToDate() else Loc.updNoConnection()
             )
 
             UpdateRow(

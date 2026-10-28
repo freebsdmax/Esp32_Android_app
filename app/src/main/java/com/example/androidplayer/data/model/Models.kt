@@ -179,7 +179,8 @@ data class OtaStatus(
     val slave_crc_build_date: String = "",
     val slave_crc_build_time: String = "",
     val slave_uart_build_date: String = "",
-    val slave_uart_build_time: String = ""
+    val slave_uart_build_time: String = "",
+
 )
 
 /**
@@ -197,7 +198,10 @@ data class VersionInfo(
     val slave_crc_build_date: String,
     val slave_crc_build_time: String,
     val slave_uart_build_date: String,
-    val slave_uart_build_time: String
+    val slave_uart_build_time: String,
+
+    /** Версія прошивки Slave (git-тег) */
+    val slave_fw_version: String = "unknown"
 )
 
 /**

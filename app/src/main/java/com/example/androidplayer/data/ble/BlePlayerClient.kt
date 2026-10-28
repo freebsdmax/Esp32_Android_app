@@ -683,7 +683,8 @@ class BlePlayerClient(context: Context) {
             slave_crc_build_date = json.optString("slave_crc_build_date"),
             slave_crc_build_time = json.optString("slave_crc_build_time"),
             slave_uart_build_date = json.optString("slave_uart_build_date"),
-            slave_uart_build_time = json.optString("slave_uart_build_time")
+            slave_uart_build_time = json.optString("slave_uart_build_time"),
+            slave_fw_version = json.optString("slave_fw_version", "unknown")
         )
     }
 
