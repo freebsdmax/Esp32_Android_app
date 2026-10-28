@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   apk:
-    name: Build debug APK
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
@@ -23,8 +23,7 @@ jobs:
 
       - uses: android-actions/setup-android@v3
         with:
-          # "tools" no longer exists in the SDK repository: installing it makes
-          # the action fail with "Failed to find package 'tools'".
+          # "tools" no longer exists in the SDK repository
           packages: "platform-tools"
 
       - name: Install SDK packages
@@ -32,18 +31,48 @@ jobs:
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Build
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          # local.properties is committed with a Windows path; let Gradle use ANDROID_HOME
+          mkdir -p keystore
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > keystore/fordplayer-release.jks
+            echo "SIGNED=yes" >> "$GITHUB_ENV"
+            echo "Keystore restored: $(stat -c%s keystore/fordplayer-release.jks) bytes"
+          else
+            echo "SIGNED=no" >> "$GITHUB_ENV"
+            echo "::warning::KEYSTORE_BASE64 is not set - building an unsigned debug APK"
+          fi
+
+      - name: Build
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
           rm -f local.properties
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+
+          TAG="${GITHUB_REF_NAME:-snapshot}"
+          VER="${TAG#v}"
+          IFS=. read -r MAJ MIN PAT <<< "$VER"
+          CODE=$(( 10#${MAJ:-0} * 10000 + 10#${MIN:-0} * 100 + 10#${PAT:-0} ))
+
+          if [ "$SIGNED" = "yes" ]; then TASK=assembleRelease; else TASK=assembleDebug; fi
+          echo "task=$TASK version=$VER ($CODE)"
+          ./gradlew --no-daemon "$TASK" -PappVersionName="$VER" -PappVersionCode="$CODE"
 
       - name: Package
         run: |
           mkdir -p out
           TAG="${GITHUB_REF_NAME:-snapshot}"
-          cp app/build/outputs/apk/debug/app-debug.apk "out/Ford-Player-${TAG}.apk"
+          if [ "$SIGNED" = "yes" ]; then
+            SRC=app/build/outputs/apk/release/app-release.apk
+          else
+            SRC=app/build/outputs/apk/debug/app-debug.apk
+          fi
+          cp "$SRC" "out/Ford-Player-${TAG}.apk"
           ls -lh out
 
       - uses: actions/upload-artifact@v4
@@ -76,4 +105,5 @@ jobs:
 
             Requirements: Android 8.0+, BLE, notification permission (Android 13+).
 
-            > This is a debug-signed build. See the repository README for release signing.
+            This build is signed with the project release key (if `KEYSTORE_BASE64`
+            is configured in the repository secrets; otherwise it is a debug build).

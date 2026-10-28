@@ -6,6 +6,27 @@ plugins {
     id 'kotlin-parcelize'
 }
 
+// ---------------------------------------------------------------------------
+// Release signing
+//   CI:     KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD
+//   local:  keystore.properties + keystore/fordplayer-release.jks (gitignored)
+// ---------------------------------------------------------------------------
+def keystorePath = System.getenv("KEYSTORE_FILE") ?: "${rootDir}/keystore/fordplayer-release.jks"
+def keystorePropsFile = rootProject.file("keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+def hasKeystore = file(keystorePath).exists()
+
+// Version comes from the git tag in CI (-PappVersionName=1.0.4 -PappVersionCode=10004)
+def appVersionCode = project.hasProperty("appVersionCode")
+        ? project.property("appVersionCode").toString().toInteger()
+        : 1
+def appVersionName = project.hasProperty("appVersionName")
+        ? project.property("appVersionName").toString()
+        : "1.0.0"
+
 android {
     namespace 'com.example.androidplayer'
     compileSdk 34
@@ -14,8 +35,8 @@ android {
         applicationId "com.example.androidplayer"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        versionCode appVersionCode
+        versionName appVersionName
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -25,14 +46,30 @@ android {
         buildConfigField "String", "ESP32_DEFAULT_IP", '"http://192.168.4.1"'
     }
 
+    signingConfigs {
+        release {
+            if (hasKeystore) {
+                storeFile file(keystorePath)
+                storePassword System.getenv("KEYSTORE_PASSWORD") ?: keystoreProps.getProperty("storePassword", "")
+                keyAlias System.getenv("KEY_ALIAS") ?: keystoreProps.getProperty("keyAlias", "")
+                keyPassword System.getenv("KEY_PASSWORD") ?: keystoreProps.getProperty("keyPassword", "")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
             minifyEnabled false
         }
         release {
-            minifyEnabled true
-            shrinkResources true
+            if (hasKeystore) {
+                signingConfig signingConfigs.release
+            }
+            // R8 is disabled on purpose: Gson/Retrofit use reflection and would
+            // need keep-rules before shrinking is safe.
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
