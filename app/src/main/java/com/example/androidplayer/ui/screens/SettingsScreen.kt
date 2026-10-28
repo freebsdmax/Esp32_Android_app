@@ -56,7 +56,7 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            UpdatesCard(state = updateState, onCheck = { updateViewModel.checkForUpdates() },
+            UpdatesCard(state = updateState, onCheck = { updateViewModel.checkForUpdates(force = true) },
                 onInstallApp = { updateViewModel.downloadAndInstallApp() },
                 onFlashFirmware = { updateViewModel.downloadAndFlashFirmware() },
                 onFlashSlave = { updateViewModel.downloadAndFlashSlave() })

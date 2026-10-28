@@ -272,6 +272,15 @@ object Loc {
     fun updNewAvailable(): String = if (isUkrainian) "Доступне оновлення" else "Update available"
     fun updateErrorCheck(): String =
         if (isUkrainian) "Не вдалося перевірити релізи на GitHub" else "Could not check GitHub releases"
+    fun updateErrorRateLimit(time: String): String =
+        if (isUkrainian) "GitHub: вичерпано ліміт запитів (60/год). Спробуйте після $time."
+        else "GitHub: request limit reached (60/h). Try again after $time."
+    fun updateErrorNetwork(): String =
+        if (isUkrainian) "Немає зв'язку з GitHub. Перевірте інтернет і спробуйте ще раз."
+        else "Cannot reach GitHub. Check your internet connection and retry."
+    fun updateFromCache(): String =
+        if (isUkrainian) "Показано збережені дані (GitHub зараз недоступний)"
+        else "Showing cached data (GitHub is unavailable right now)"
     fun updateErrorNoApk(): String =
         if (isUkrainian) "У релізі немає APK" else "The release has no APK"
     fun updateErrorNoBin(): String =

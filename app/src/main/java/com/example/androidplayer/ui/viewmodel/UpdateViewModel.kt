@@ -6,6 +6,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.androidplayer.BuildConfig
+import com.example.androidplayer.data.github.GitHubError
 import com.example.androidplayer.data.github.GitHubReleaseClient
 import com.example.androidplayer.data.model.ReleaseInfo
 import com.example.androidplayer.data.model.VersionCompare
@@ -65,14 +66,15 @@ class UpdateViewModel @Inject constructor(
         checkForUpdates()
     }
 
-    fun checkForUpdates() {
+    fun checkForUpdates(force: Boolean = false) {
         if (_uiState.value.busy) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(checking = true, error = null, status = null)
 
-            val app = github.latestRelease(APP_REPO)
-            val fw = github.latestRelease(FW_REPO)
-            val slave = github.latestRelease(SLAVE_REPO)
+            val maxAge = if (force) 0L else GitHubReleaseClient.CACHE_TTL_MS
+            val app = github.latestRelease(APP_REPO, maxAge)
+            val fw = github.latestRelease(FW_REPO, maxAge)
+            val slave = github.latestRelease(SLAVE_REPO, maxAge)
             appRelease = app
             fwRelease = fw
             slaveRelease = slave
@@ -112,8 +114,21 @@ class UpdateViewModel @Inject constructor(
 
             if (app == null && fw == null && slave == null) {
                 _uiState.value = _uiState.value.copy(
-                    error = Loc.updateErrorCheck()
+                    error = when (val failure = github.lastError) {
+                        is GitHubError.RateLimited -> {
+                            val time = if (failure.resetAt > 0) {
+                                java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                                    .format(java.util.Date(failure.resetAt))
+                            } else "~1 год"
+                            Loc.updateErrorRateLimit(time)
+                        }
+                        is GitHubError.Network -> Loc.updateErrorNetwork()
+                        else -> Loc.updateErrorCheck()
+                    }
                 )
+            } else if (github.lastError != null) {
+                // Releases came from the local cache: still usable, but say why.
+                _uiState.value = _uiState.value.copy(status = Loc.updateFromCache())
             }
         }
     }
