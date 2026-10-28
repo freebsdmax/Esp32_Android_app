@@ -1,5 +1,8 @@
 package com.example.androidplayer.ui.screens
 
+import com.example.androidplayer.ui.i18n.Loc
+import com.example.androidplayer.ui.i18n.tr
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidplayer.ui.viewmodel.SystemMonitorUiState
 import com.example.androidplayer.ui.viewmodel.SystemMonitorViewModel
+import com.example.androidplayer.ui.notify.AppNotify
 
 /**
  * Экран мониторинга системы
@@ -30,12 +34,21 @@ fun SystemMonitorScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+
+    // Log settings are re-read every time this screen is opened, so the
+    // "Load" button is only needed for a manual refresh.
+    LaunchedEffect(Unit) {
+        viewModel.loadCurrentLogSettings()
+    }
+
+    LaunchedEffect(error) {
+        error?.let { AppNotify.error(it) }
+    }
     
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .systemBarsPadding()
     ) {
         // Заголовок с кнопкой обновления
         Row(
@@ -46,8 +59,8 @@ fun SystemMonitorScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "📊 Мониторинг системы",
-                style = MaterialTheme.typography.headlineSmall,
+                text = tr("Огляд"),
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             
@@ -58,7 +71,7 @@ fun SystemMonitorScreen(
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp))
                 } else {
-                    Icon(Icons.Default.Refresh, contentDescription = "Обновить")
+                    Icon(Icons.Default.Refresh, contentDescription = tr("Обновить"))
                 }
             }
         }
@@ -129,7 +142,7 @@ private fun SystemInfoSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "💻 Системная информация",
+                text = tr("💻 Системная информация"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -144,7 +157,7 @@ private fun SystemInfoSection(
                 )
             } else {
                 Text(
-                    text = "Загрузка информации о системе...",
+                    text = tr("Загрузка информации о системе..."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -168,7 +181,7 @@ private fun CanStatisticsSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "📡 Статистика CAN",
+                text = tr("📡 Статистика CAN"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -183,7 +196,7 @@ private fun CanStatisticsSection(
                 )
             } else {
                 Text(
-                    text = "Загрузка статистики CAN...",
+                    text = tr("Загрузка статистики CAN..."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -214,7 +227,7 @@ private fun LogSettingsSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "📝 Настройки логирования",
+                text = tr("📝 Настройки логирования"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -229,7 +242,7 @@ private fun LogSettingsSection(
                     value = getLogLevelName(selectedLogLevel),
                     onValueChange = { },
                     readOnly = true,
-                    label = { Text("Уровень логов") },
+                    label = { Text(tr("Уровень логов")) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedLevel) },
                     modifier = Modifier
                         .menuAnchor()
@@ -264,34 +277,44 @@ private fun LogSettingsSection(
                     onCheckedChange = { verboseLogs = it }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Детальные логи (эмодзи и баннеры)")
+                Text(tr("Детальные логи (эмодзи и баннеры)"))
             }
             
             Spacer(modifier = Modifier.height(12.dp))
             
             // Настройки компонентов
             Text(
-                text = "Логи компонентов:",
+                text = tr("Логи компонентов:"),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium
             )
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            ComponentLogItem("Player", componentLogs.player == 1) {
-                componentLogs = componentLogs.copy(player = if (componentLogs.player == 1) 0 else 1)
+            ComponentLogItem(Loc.logGroupPlayer(), componentLogs.group_player == 1) {
+                componentLogs = componentLogs.copy(
+                    group_player = if (componentLogs.group_player == 1) 0 else 1
+                )
             }
-            ComponentLogItem("WiFi CAN Sniffer", componentLogs.wifi_can_sniffer == 1) {
-                componentLogs = componentLogs.copy(wifi_can_sniffer = if (componentLogs.wifi_can_sniffer == 1) 0 else 1)
+            ComponentLogItem(Loc.logGroupConnect(), componentLogs.group_connect == 1) {
+                componentLogs = componentLogs.copy(
+                    group_connect = if (componentLogs.group_connect == 1) 0 else 1
+                )
             }
-            ComponentLogItem("Web OTA", componentLogs.web_ota == 1) {
-                componentLogs = componentLogs.copy(web_ota = if (componentLogs.web_ota == 1) 0 else 1)
+            ComponentLogItem(Loc.logGroupOta(), componentLogs.group_ota == 1) {
+                componentLogs = componentLogs.copy(
+                    group_ota = if (componentLogs.group_ota == 1) 0 else 1
+                )
             }
-            ComponentLogItem("UART OTA", componentLogs.uart_ota == 1) {
-                componentLogs = componentLogs.copy(uart_ota = if (componentLogs.uart_ota == 1) 0 else 1)
+            ComponentLogItem(Loc.logGroupCar(), componentLogs.group_car == 1) {
+                componentLogs = componentLogs.copy(
+                    group_car = if (componentLogs.group_car == 1) 0 else 1
+                )
             }
-            ComponentLogItem("ELM327", componentLogs.elm327 == 1) {
-                componentLogs = componentLogs.copy(elm327 = if (componentLogs.elm327 == 1) 0 else 1)
+            ComponentLogItem(Loc.logGroupSystem(), componentLogs.group_system == 1) {
+                componentLogs = componentLogs.copy(
+                    group_system = if (componentLogs.group_system == 1) 0 else 1
+                )
             }
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -306,7 +329,7 @@ private fun LogSettingsSection(
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Загрузить")
+                    Text(tr("Загрузить"))
                 }
                 
                 Button(
@@ -321,7 +344,7 @@ private fun LogSettingsSection(
                 ) {
                     Icon(Icons.Default.Save, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Сохранить")
+                    Text(tr("Сохранить"))
                 }
             }
         }
@@ -375,17 +398,17 @@ private fun SystemLogsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "📋 Системные логи",
+                    text = tr("📋 Системные логи"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 
                 Row {
                     IconButton(onClick = onRefreshLogs) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Обновить логи")
+                        Icon(Icons.Default.Refresh, contentDescription = tr("Обновить логи"))
                     }
                     IconButton(onClick = onClearLogs) {
-                        Icon(Icons.Default.Delete, contentDescription = "Очистить логи")
+                        Icon(Icons.Default.Delete, contentDescription = tr("Очистить логи"))
                     }
                 }
             }
@@ -419,7 +442,7 @@ private fun SystemLogsSection(
                 }
             } else {
                 Text(
-                    text = "Логи отсутствуют",
+                    text = tr("Логи отсутствуют"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -454,7 +477,7 @@ private fun ErrorCard(
         ) {
             Icon(
                 Icons.Default.Error,
-                contentDescription = "Ошибка",
+                contentDescription = tr("Ошибка"),
                 tint = MaterialTheme.colorScheme.onErrorContainer
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -466,7 +489,7 @@ private fun ErrorCard(
             IconButton(onClick = onDismiss) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Закрыть",
+                    contentDescription = tr("Закрыть"),
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
             }

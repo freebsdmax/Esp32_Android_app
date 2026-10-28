@@ -1,5 +1,7 @@
 package com.example.androidplayer.ui.screens
 
+import com.example.androidplayer.ui.i18n.tr
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,15 +38,8 @@ fun WifiSettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .systemBarsPadding()
     ) {
         // Заголовок
-        Text(
-            text = "🌐 Настройки Wi-Fi",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
         
         if (isLoading) {
             Box(
@@ -128,7 +123,7 @@ private fun WiFiModeSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "Режим Wi-Fi",
+                text = tr("Режим Wi-Fi"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -173,9 +168,9 @@ private fun WiFiModeSection(
             
             Text(
                 text = when (mode) {
-                    0 -> "AP (Access Point) - ESP32 создает собственную Wi-Fi сеть"
-                    1 -> "STA (Station) - ESP32 подключается к существующей Wi-Fi сети"
-                    else -> "Неизвестный режим"
+                    0 -> tr("AP (Access Point) — ESP32 створює власну Wi-Fi мережу")
+                    1 -> tr("STA (Station) — ESP32 підключається до наявної Wi-Fi мережі")
+                    else -> tr("Невідомий режим")
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -201,7 +196,7 @@ private fun StaSettingsSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "STA Настройки (подключение к сети)",
+                text = tr("STA Настройки (подключение к сети)"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -210,7 +205,7 @@ private fun StaSettingsSection(
             OutlinedTextField(
                 value = ssid,
                 onValueChange = onSsidChange,
-                label = { Text("SSID (название сети)") },
+                label = { Text(tr("SSID (название сети)")) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = {
@@ -225,7 +220,7 @@ private fun StaSettingsSection(
             OutlinedTextField(
                 value = password,
                 onValueChange = onPasswordChange,
-                label = { Text("Пароль") },
+                label = { Text(tr("Пароль")) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -237,7 +232,7 @@ private fun StaSettingsSection(
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
                             if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (passwordVisible) "Скрыть пароль" else "Показать пароль"
+                            contentDescription = if (passwordVisible) tr("Приховати пароль") else tr("Показати пароль")
                         )
                     }
                 }
@@ -263,7 +258,7 @@ private fun ApSettingsSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "AP Настройки (создание сети)",
+                text = tr("AP Настройки (создание сети)"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -272,7 +267,7 @@ private fun ApSettingsSection(
             OutlinedTextField(
                 value = ssid,
                 onValueChange = onSsidChange,
-                label = { Text("SSID (название сети)") },
+                label = { Text(tr("SSID (название сети)")) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = {
@@ -287,7 +282,7 @@ private fun ApSettingsSection(
             OutlinedTextField(
                 value = password,
                 onValueChange = onPasswordChange,
-                label = { Text("Пароль") },
+                label = { Text(tr("Пароль")) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -299,7 +294,7 @@ private fun ApSettingsSection(
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
                             if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (passwordVisible) "Скрыть пароль" else "Показать пароль"
+                            contentDescription = if (passwordVisible) tr("Приховати пароль") else tr("Показати пароль")
                         )
                     }
                 }
@@ -331,7 +326,7 @@ private fun SaveButton(
             Icon(Icons.Default.Save, contentDescription = null)
             Spacer(modifier = Modifier.width(4.dp))
         }
-        Text("Сохранить настройки")
+        Text(tr("Сохранить настройки"))
     }
 }
 
@@ -354,7 +349,7 @@ private fun SuccessCard(
         ) {
             Icon(
                 Icons.Default.CheckCircle,
-                contentDescription = "Успех",
+                contentDescription = tr("Успех"),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -389,7 +384,7 @@ private fun ErrorCard(
         ) {
             Icon(
                 Icons.Default.Error,
-                contentDescription = "Ошибка",
+                contentDescription = tr("Ошибка"),
                 tint = MaterialTheme.colorScheme.onErrorContainer
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -401,7 +396,7 @@ private fun ErrorCard(
             IconButton(onClick = onDismiss) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Закрыть",
+                    contentDescription = tr("Закрыть"),
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
             }

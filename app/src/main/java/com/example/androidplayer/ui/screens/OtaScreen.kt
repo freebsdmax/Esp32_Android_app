@@ -1,5 +1,7 @@
 package com.example.androidplayer.ui.screens
 
+import com.example.androidplayer.ui.i18n.tr
+
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,9 +19,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.androidplayer.ui.i18n.Loc
 import com.example.androidplayer.ui.viewmodel.OtaUiState
 import com.example.androidplayer.ui.viewmodel.OtaViewModel
 import java.io.File
+import com.example.androidplayer.ui.notify.AppNotify
 
 /**
  * Экран OTA обновлений
@@ -31,55 +35,50 @@ fun OtaScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+
+    LaunchedEffect(error) { error?.let { AppNotify.error(it) } }
+    LaunchedEffect(uiState.errorMessage) { uiState.errorMessage?.let { AppNotify.error(it) } }
+    LaunchedEffect(uiState.uploadMessage) { uiState.uploadMessage?.let { AppNotify.info(it) } }
+    LaunchedEffect(uiState.restartMessage) { uiState.restartMessage?.let { AppNotify.info(it) } }
     
     val context = LocalContext.current
     
     // File picker для выбора прошивки
-    val filePickerLauncher = rememberLauncherForActivityResult(
+    val bleFirmwarePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
             context.contentResolver.openInputStream(it)?.use { inputStream ->
-                val fileName = "firmware_${System.currentTimeMillis()}.bin"
-                val tempFile = File(context.cacheDir, fileName)
-                tempFile.outputStream().use { outputStream ->
-                    inputStream.copyTo(outputStream)
-                }
-                
-                // Определяем тип прошивки по имени файла
-                when {
-                    fileName.contains("master", ignoreCase = true) || 
-                    fileName.contains("main", ignoreCase = true) -> {
-                        viewModel.uploadMasterFirmware(tempFile)
-                    }
-                    fileName.contains("slave", ignoreCase = true) -> {
-                        viewModel.uploadSlaveFirmware(tempFile)
-                    }
-                    else -> {
-                        // По умолчанию загружаем на Master
-                        viewModel.uploadMasterFirmware(tempFile)
-                    }
-                }
+                val tempFile = File(context.cacheDir, "firmware_ble_${System.currentTimeMillis()}.bin")
+                tempFile.outputStream().use { out -> inputStream.copyTo(out) }
+                viewModel.uploadMasterFirmwareBle(tempFile)
             }
         }
     }
-    
+
+    val slaveFirmwarePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            context.contentResolver.openInputStream(it)?.use { inputStream ->
+                val tempFile = File(context.cacheDir, "slave_ble_${System.currentTimeMillis()}.bin")
+                tempFile.outputStream().use { out -> inputStream.copyTo(out) }
+                viewModel.uploadSlaveFirmwareBle(tempFile)
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .systemBarsPadding()
     ) {
         // Заголовок
-        Text(
-            text = "🔧 OTA Обновления",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
         
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Информация о версиях
@@ -95,30 +94,59 @@ fun OtaScreen(
             }
             
             // Загрузка прошивки Master
-            item {
-                MasterFirmwareSection(
-                    onSelectFile = {
-                        filePickerLauncher.launch("application/octet-stream")
-                    },
-                    onUpload = {
-                        filePickerLauncher.launch("application/octet-stream")
+                        item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "BLE OTA (Master)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = tr("Works without Wi-Fi. Slow (1-5 min)."),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        Button(
+                            onClick = { bleFirmwarePicker.launch("application/octet-stream") },
+                            enabled = !uiState.isUploading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(tr("Update over BLE"))
+                        }
                     }
-                )
+                }
             }
             
             // Загрузка прошивки Slave
-            item {
-                SlaveFirmwareSection(
-                    onSelectFile = {
-                        filePickerLauncher.launch("application/octet-stream")
-                    },
-                    onUpload = {
-                        filePickerLauncher.launch("application/octet-stream")
-                    }
-                )
-            }
-            
+                        
             // Управление устройством
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "BLE OTA (Slave)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = tr("Master передає прошивку Slave по UART. Не вимикайте живлення."),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        Button(
+                            onClick = { slaveFirmwarePicker.launch("application/octet-stream") },
+                            enabled = !uiState.isUploading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(tr("Оновити Slave"))
+                        }
+                    }
+                }
+            }
+
             item {
                 DeviceControlSection(
                     onRestart = { viewModel.restartDevice() }
@@ -146,6 +174,13 @@ fun OtaScreen(
                 onDismiss = { viewModel.clearError() }
             )
         }
+
+        uiState.errorMessage?.let { errorMessage ->
+            ErrorCard(
+                message = errorMessage,
+                onDismiss = { viewModel.clearError() }
+            )
+        }
     }
 }
 
@@ -163,7 +198,7 @@ private fun VersionInfoSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "📋 Информация о версиях",
+                text = tr("📋 Информация о версиях"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -171,7 +206,7 @@ private fun VersionInfoSection(
             
             // Master версии
             Text(
-                text = "🖥️ Master ESP32:",
+                text = tr("🖥️ Master ESP32:"),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -183,7 +218,7 @@ private fun VersionInfoSection(
             
             // Slave версии
             Text(
-                text = "🎵 Slave ESP32:",
+                text = tr("🎵 Slave ESP32:"),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
@@ -219,7 +254,7 @@ private fun VersionItem(
             text = version,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = if (version.contains("Не подключен")) {
+            color = if (Loc.isDisconnectedText(version)) {
                 MaterialTheme.colorScheme.error
             } else {
                 MaterialTheme.colorScheme.primary
@@ -245,14 +280,14 @@ private fun OtaProgressSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "📊 Прогресс OTA",
+                text = tr("📊 Прогресс OTA"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             
             Text(
-                text = "Цель: ${uiState.uploadTarget}",
+                text = tr("Ціль: %s").format(uiState.uploadTarget),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -269,18 +304,41 @@ private fun OtaProgressSection(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "${(uiState.uploadProgress * 100).toInt()}%",
+                    text = "${(uiState.uploadProgress * 100).toInt()}%  " +
+                        Loc.otaPhaseName(uiState.uploadPhaseApply),
                     style = MaterialTheme.typography.bodySmall
                 )
-                Text(
-                    text = "${uiState.writtenBytes} / ${uiState.totalBytes} байт",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                if (uiState.uploadTotal > 0) {
+                    Text(
+                        text = Loc.sizeText(uiState.uploadBytes) + " / " +
+                            Loc.sizeText(uiState.uploadTotal),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
-            
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (uiState.uploadBytesPerSec > 0)
+                        Loc.speedText(uiState.uploadBytesPerSec)
+                    else "…",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                if (uiState.uploadEtaSeconds >= 0) {
+                    Text(
+                        text = Loc.etaText(uiState.uploadEtaSeconds),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
             if (uiState.isUartSlave) {
                 Text(
-                    text = "Блок: ${uiState.currentBlock}",
+                    text = tr("Блок: %d").format(uiState.currentBlock),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 4.dp)
                 )
@@ -304,14 +362,14 @@ private fun MasterFirmwareSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "🖥️ Master ESP32 (этот прибор)",
+                text = tr("🖥️ Master ESP32 (этот прибор)"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             
             Text(
-                text = "Обновление основной прошивки ESP32. Устройство будет перезагружено после обновления.",
+                text = tr("Обновление основной прошивки ESP32. Устройство будет перезагружено после обновления."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -323,7 +381,7 @@ private fun MasterFirmwareSection(
             ) {
                 Icon(Icons.Default.Upload, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Выбрать и загрузить прошивку Master")
+                Text(tr("Выбрать и загрузить прошивку Master"))
             }
         }
     }
@@ -344,14 +402,14 @@ private fun SlaveFirmwareSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "🎵 Slave ESP32 (Bluetooth модуль через UART)",
+                text = tr("🎵 Slave ESP32 (Bluetooth модуль через UART)"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             
             Text(
-                text = "Обновление прошивки Slave ESP32 через UART. Передача происходит блоками по 240 байт с проверкой CRC.",
+                text = tr("Обновление прошивки Slave ESP32 через UART. Передача происходит блоками по 240 байт с проверкой CRC."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -366,7 +424,7 @@ private fun SlaveFirmwareSection(
             ) {
                 Icon(Icons.Default.Upload, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Выбрать и загрузить прошивку Slave")
+                Text(tr("Выбрать и загрузить прошивку Slave"))
             }
         }
     }
@@ -386,7 +444,7 @@ private fun DeviceControlSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "⚙️ Управление устройством",
+                text = tr("⚙️ Управление устройством"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -401,11 +459,11 @@ private fun DeviceControlSection(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Перезагрузить устройство")
+                Text(tr("Перезагрузить устройство"))
             }
             
             Text(
-                text = "⚠️ Внимание: Перезагрузка прервет текущее воспроизведение",
+                text = tr("⚠️ Внимание: Перезагрузка прервет текущее воспроизведение"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 8.dp)
@@ -433,7 +491,7 @@ private fun SuccessCard(
         ) {
             Icon(
                 Icons.Default.CheckCircle,
-                contentDescription = "Успех",
+                contentDescription = tr("Успех"),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -465,7 +523,7 @@ private fun InfoCard(
         ) {
             Icon(
                 Icons.Default.Info,
-                contentDescription = "Информация",
+                contentDescription = tr("Информация"),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -500,7 +558,7 @@ private fun ErrorCard(
         ) {
             Icon(
                 Icons.Default.Error,
-                contentDescription = "Ошибка",
+                contentDescription = tr("Ошибка"),
                 tint = MaterialTheme.colorScheme.onErrorContainer
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -512,7 +570,7 @@ private fun ErrorCard(
             IconButton(onClick = onDismiss) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Закрыть",
+                    contentDescription = tr("Закрыть"),
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
             }

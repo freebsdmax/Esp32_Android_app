@@ -1,309 +1,305 @@
 package com.example.androidplayer.ui.screens
 
+import com.example.androidplayer.ui.i18n.tr
+
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.BluetoothConnected
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.androidplayer.data.ble.BlePlayerClient
 import com.example.androidplayer.ui.viewmodel.SettingsViewModel
+import com.example.androidplayer.ui.notify.AppNotify
 
-/**
- * Экран настроек приложения
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    ble: BlePlayerClient,
+    onOpenBle: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var ipText by remember(uiState.esp32Ip) { mutableStateOf(uiState.esp32Ip) }
-    
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .systemBarsPadding()
+    val connected by ble.isConnected.collectAsStateWithLifecycle()
+
+    LaunchedEffect(uiState.saveMessage) {
+        uiState.saveMessage?.let { AppNotify.info(it) }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Заголовок
-        Text(
-            text = "⚙️ Настройки",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Настройки подключения
-            item {
-                ConnectionSettingsSection(
-                    ip = ipText,
-                    onIpChange = { ipText = it },
-                    onSaveIp = { 
-                        viewModel.updateEsp32Ip(ipText)
-                        viewModel.saveEsp32Ip()
-                    },
-                    defaultIp = SettingsViewModel.DEFAULT_ESP32_IP
-                )
+        item {
+            BleConnectionCard(
+                connected = connected,
+                deviceLabel = ble.currentDeviceLabel(),
+                onOpenBle = onOpenBle,
+                onConnect = { ble.connectRememberedDevice() },
+                onDisconnect = { ble.disconnect() }
+            )
+        }
+        item {
+            AppearanceCard(
+                darkTheme = uiState.darkTheme,
+                onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            SleepCard(
+                sleepMode = uiState.sleepMode,
+                timeoutSec = uiState.sleepTimeoutSec,
+                onModeChange = { viewModel.setSleepMode(it) },
+                onTimeoutChange = { viewModel.setSleepTimeoutSeconds(it) },
+                onSave = { viewModel.saveSleepSettings() }
+            )
+        }
+        item { AboutCard() }
+        if (uiState.isSaved && uiState.saveMessage != null) {
+            item { SavedBanner(uiState.saveMessage!!) }
+        }
+    }
+}
+
+@Composable
+private fun BleConnectionCard(
+    connected: Boolean,
+    deviceLabel: String,
+    onOpenBle: () -> Unit,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(
+                icon = if (connected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
+                title = tr("Підключення"),
+                subtitle = if (connected) tr("Підключено по BLE") else tr("Немає з'єднання")
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = if (connected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                    else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = deviceLabel,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (connected) MaterialTheme.colorScheme.secondary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            
-            // Общие настройки
-            item {
-                GeneralSettingsSection(
-                    autoReconnect = uiState.autoReconnect,
-                    showNotifications = uiState.showNotifications,
-                    darkTheme = uiState.darkTheme,
-                    onSettingChange = { key, value -> 
-                        viewModel.updateSetting(key, value)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (connected) {
+                    OutlinedButton(
+                        onClick = onDisconnect,
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Default.LinkOff, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("Від'єднати"))
                     }
-                )
-            }
-            
-            // Информация о приложении
-            item {
-                AppInfoSection()
-            }
-            
-            // Сообщение о сохранении
-            if (uiState.isSaved && uiState.saveMessage != null) {
-                item {
-                    SuccessCard(message = uiState.saveMessage!!)
+                } else {
+                    Button(
+                        onClick = onConnect,
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Default.Bluetooth, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("Підключити"))
+                    }
+                }
+                Button(
+                    onClick = onOpenBle,
+                    modifier = Modifier.weight(1f),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(tr("Сканувати"))
                 }
             }
         }
     }
 }
 
-/**
- * Секция настроек подключения
- */
 @Composable
-private fun ConnectionSettingsSection(
-    ip: String,
-    onIpChange: (String) -> Unit,
-    onSaveIp: () -> Unit,
-    defaultIp: String
+private fun AppearanceCard(
+    darkTheme: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = "🔌 Подключение к ESP32",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionHeader(
+                icon = Icons.Default.DarkMode,
+                title = tr("Зовнішній вигляд"),
+                subtitle = tr("Оформлення інтерфейсу")
             )
-            
-            OutlinedTextField(
-                value = ip,
-                onValueChange = onIpChange,
-                label = { Text("IP адрес ESP32") },
-                placeholder = { Text("http://192.168.4.1") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                leadingIcon = {
-                    Icon(Icons.Default.Wifi, contentDescription = null)
-                },
-                trailingIcon = {
-                    IconButton(onClick = { onIpChange(defaultIp) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Сбросить")
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(tr("Темна тема"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        tr("Застосовується одразу"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SleepCard(
+    sleepMode: Int,
+    timeoutSec: Int,
+    onModeChange: (Int) -> Unit,
+    onTimeoutChange: (Int) -> Unit,
+    onSave: () -> Unit
+) {
+    var timeoutText by remember(timeoutSec) { mutableStateOf(timeoutSec.toString()) }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(
+                icon = Icons.Default.Bedtime,
+                title = tr("Сон та енергозбереження"),
+                subtitle = tr("Пристрій засинає після простою")
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                listOf(
+                    0 to tr("Вимкнено"),
+                    1 to "Light sleep",
+                    3 to "Deep sleep"
+                ).forEach { (mode, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onModeChange(mode) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = sleepMode == mode,
+                            onClick = { onModeChange(mode) }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
                     }
                 }
+            }
+            OutlinedTextField(
+                value = timeoutText,
+                onValueChange = { text ->
+                    val digits = text.filter { it.isDigit() }.take(5)
+                    timeoutText = digits
+                    digits.toIntOrNull()?.let(onTimeoutChange)
+                },
+                label = { Text(tr("Таймаут простою (с)")) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
+            Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Зберегти"))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutCard() {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SectionHeader(
+                icon = Icons.Default.Info,
+                title = tr("Про Ford Player"),
+                subtitle = "Ford Player"
+            )
+            Text(tr("Версія 1.0.0"), style = MaterialTheme.typography.bodyMedium)
             Text(
-                text = "По умолчанию: $defaultIp",
+                tr("Керування Ford Player через Bluetooth: плеєр, плейлист, OTA та моніторинг."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Button(
-                onClick = onSaveIp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Save, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Сохранить IP адрес")
-            }
         }
     }
 }
 
-/**
- * Секция общих настроек
- */
 @Composable
-private fun GeneralSettingsSection(
-    autoReconnect: Boolean,
-    showNotifications: Boolean,
-    darkTheme: Boolean,
-    onSettingChange: (String, Boolean) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = "📱 Общие настройки",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            
-            SettingSwitch(
-                title = "Автоподключение",
-                description = "Автоматически подключаться к ESP32 при запуске",
-                checked = autoReconnect,
-                onCheckedChange = { onSettingChange("auto_reconnect", it) }
-            )
-            
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
-            
-            SettingSwitch(
-                title = "Уведомления",
-                description = "Показывать уведомления о статусе подключения",
-                checked = showNotifications,
-                onCheckedChange = { onSettingChange("show_notifications", it) }
-            )
-            
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
-            
-            SettingSwitch(
-                title = "Тёмная тема",
-                description = "Использовать тёмную тему оформления",
-                checked = darkTheme,
-                onCheckedChange = { onSettingChange("dark_theme", it) }
-            )
-        }
-    }
-}
-
-/**
- * Переключатель настройки
- */
-@Composable
-private fun SettingSwitch(
+private fun SectionHeader(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    subtitle: String
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange
-        )
-    }
-}
-
-/**
- * Секция информации о приложении
- */
-@Composable
-private fun AppInfoSection() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = "ℹ️ О приложении",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
-            Text(
-                text = "ESP32 Player Control",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium
-            )
-            
-            Text(
-                text = "Версия: 1.0.0",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "Приложение для управления ESP32 Music Player по Wi-Fi. Поддерживает управление воспроизведением, настройки Wi-Fi, OTA обновления и мониторинг системы.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-/**
- * Карточка успеха
- */
-@Composable
-private fun SuccessCard(message: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
         ) {
             Icon(
-                Icons.Default.CheckCircle,
-                contentDescription = "Успех",
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                icon,
+                contentDescription = null,
+                modifier = Modifier.padding(8.dp).size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = message,
-                modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+        }
+        Column {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun SavedBanner(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(Modifier.width(10.dp))
+            Text(message, color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
     }
 }

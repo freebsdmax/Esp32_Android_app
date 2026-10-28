@@ -10,6 +10,7 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+import android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
@@ -20,6 +21,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.os.ParcelUuid
 import com.example.androidplayer.data.model.CanStatistics
 import com.example.androidplayer.data.model.ComponentLogSettings
@@ -33,12 +35,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import androidx.core.content.ContextCompat
 import timber.log.Timber
 import java.util.UUID
 import java.util.ArrayDeque
+import com.example.androidplayer.ui.i18n.tr
 
 /**
  * BLE Player клієнт для управління ESP32 плеєром по Bluetooth LE
@@ -47,6 +51,20 @@ class BlePlayerClient(context: Context) {
     private val context = context
     private val preferences = context.applicationContext.getSharedPreferences("ble_player", Context.MODE_PRIVATE)
     private val reconnectHandler = Handler(Looper.getMainLooper())
+    private val reconnectWatchdog = object : Runnable {
+        override fun run() {
+            if (!explicitlyDisconnected && !manualReconnectInProgress &&
+                !_isConnected.value && hasRememberedDevice()
+            ) {
+                Timber.d("BLE watchdog: reconnecting...")
+                connectRememberedDevice()
+            }
+            reconnectHandler.postDelayed(this, 4000)
+        }
+    }
+    init {
+        reconnectHandler.postDelayed(reconnectWatchdog, 4000)
+    }
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private val scanner: BluetoothLeScanner? = bluetoothAdapter?.bluetoothLeScanner
     private var bluetoothGatt: BluetoothGatt? = null
@@ -73,9 +91,30 @@ class BlePlayerClient(context: Context) {
     private val pendingNotificationDescriptors = ArrayDeque<BluetoothGattDescriptor>()
     private val commandWriteLock = Any()
     private val pendingCommandWrites = ArrayDeque<ByteArray>()
+    private val pendingOtaWrites = ArrayDeque<ByteArray>()
+    private val otaWriteLock = Any()
+    /** Guards the single GATT characteristic: OTA frames and commands must not interleave. */
+    private val writeArbiter = Any()
+    private var otaWriteInProgress = false
+    @Volatile private var negotiatedMtu = 23
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var commandWriteInProgress = false
     private val rpcMutex = Mutex()
     @Volatile private var pendingRpcResponse: CompletableDeferred<String>? = null
+    /** Last rejection reason reported by the device for `file.data`. */
+    @Volatile var lastFileOtaError: String = ""
+
+    /** True when the device received fewer bytes than were sent (ATT MTU mismatch). */
+    @Volatile var lastFileOtaTruncated: Boolean = false
+
+    /**
+     * Largest command the device actually received. Learned from rejections: if a
+     * 361-byte request reaches the device as 244 bytes, only 244 can be used.
+     */
+    @Volatile private var observedCommandBytes: Int = 0
+
+    @Volatile private var servicesDiscovered = false
+    @Volatile private var manualReconnectInProgress = false
 
     private val _statusData = MutableStateFlow<com.example.androidplayer.data.model.PlayerStatus?>(null)
     val statusData: StateFlow<com.example.androidplayer.data.model.PlayerStatus?> = _statusData
@@ -119,6 +158,9 @@ class BlePlayerClient(context: Context) {
                     _serviceReady.value = false
                     _serviceError.value = null
                     _notificationsReady.value = false
+                    servicesDiscovered = false
+                    negotiatedMtu = 23
+                    observedCommandBytes = 0
                     if (!gatt.requestMtu(512)) {
                         gatt.discoverServices()
                     }
@@ -130,6 +172,8 @@ class BlePlayerClient(context: Context) {
                     _serviceError.value = null
                     _notificationsReady.value = false
                     pendingNotificationDescriptors.clear()
+                    servicesDiscovered = false
+                    negotiatedMtu = 23
                     synchronized(commandWriteLock) {
                         pendingCommandWrites.clear()
                         commandWriteInProgress = false
@@ -147,14 +191,20 @@ class BlePlayerClient(context: Context) {
 
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
             super.onMtuChanged(gatt, mtu, status)
+            negotiatedMtu = mtu
             Timber.d("BLE MTU negotiated: mtu=$mtu status=$status")
-            gatt.discoverServices()
+            // Re-discovering services tears down CCCD subscriptions, which would
+            // break an update in progress. Only discover once per connection.
+            if (!servicesDiscovered) {
+                gatt.discoverServices()
+            }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             super.onServicesDiscovered(gatt, status)
             
             if (status == BluetoothGatt.GATT_SUCCESS) {
+                servicesDiscovered = true
                 val service = gatt.getService(PLAYER_SERVICE_UUID)
                 if (service != null) {
                     commandCharacteristic = service.getCharacteristic(COMMAND_CHAR_UUID)
@@ -216,6 +266,11 @@ class BlePlayerClient(context: Context) {
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            if (otaWriteInProgress) {
+                synchronized(otaWriteLock) { otaWriteInProgress = false }
+                startNextOtaWrite()
+                return
+            }
             super.onCharacteristicWrite(gatt, characteristic, status)
             
             if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -301,13 +356,19 @@ class BlePlayerClient(context: Context) {
             throw IllegalStateException("BLE request could not be sent: $operation")
         }
 
-        try {
+        val text = try {
             withTimeout(5000) { response.await() }
+        } catch (e: TimeoutCancellationException) {
+            Timber.w("BLE RPC timeout: $operation")
+            throw IllegalStateException(
+                "BLE response timeout for '$operation' (device did not answer in 5s)"
+            )
         } finally {
             if (pendingRpcResponse === response) {
                 pendingRpcResponse = null
             }
         }
+        text
     }
 
     suspend fun getWifiSettings(): WifiSettings {
@@ -367,7 +428,22 @@ class BlePlayerClient(context: Context) {
             wifi_can_sniffer = json.optInt("wifi_can_sniffer", 1),
             web_ota = json.optInt("web_ota", 1),
             uart_ota = json.optInt("uart_ota", 1),
-            elm327 = json.optInt("elm327", 1)
+            elm327 = json.optInt("elm327", 1),
+            pipeline = json.optInt("pipeline", 1),
+            can = json.optInt("can", 1),
+            usb = json.optInt("usb", 1),
+            ble = json.optInt("ble", 1),
+            wifi = json.optInt("wifi", 1),
+            sleep = json.optInt("sleep", 1),
+            playlist = json.optInt("playlist", 1),
+            console = json.optInt("console", 1),
+            link = json.optInt("link", 1),
+            nvs = json.optInt("nvs", 1),
+            group_player = json.optInt("group_player", 1),
+            group_connect = json.optInt("group_connect", 1),
+            group_ota = json.optInt("group_ota", 1),
+            group_car = json.optInt("group_car", 1),
+            group_system = json.optInt("group_system", 1)
         )
     }
 
@@ -378,12 +454,192 @@ class BlePlayerClient(context: Context) {
             .put("web_ota", settings.web_ota)
             .put("uart_ota", settings.uart_ota)
             .put("elm327", settings.elm327)
+            .put("pipeline", settings.pipeline)
+            .put("can", settings.can)
+            .put("usb", settings.usb)
+            .put("ble", settings.ble)
+            .put("wifi", settings.wifi)
+            .put("sleep", settings.sleep)
+            .put("playlist", settings.playlist)
+            .put("console", settings.console)
+            .put("link", settings.link)
+            .put("nvs", settings.nvs)
+            .put("group_player", settings.group_player)
+            .put("group_connect", settings.group_connect)
+            .put("group_ota", settings.group_ota)
+            .put("group_car", settings.group_car)
+            .put("group_system", settings.group_system)
             .toString()
         val result = JSONObject(rpc("component_logs.set", payload))
         if (!result.optBoolean("success")) {
             throw IllegalStateException(result.optString("error", "Log settings were rejected"))
         }
         return "OK"
+    }
+
+
+    suspend fun otaBegin(totalSize: Int): Boolean {
+        val payload = JSONObject().put("size", totalSize).toString()
+        val result = JSONObject(rpc("ota.begin", payload))
+        if (!result.optBoolean("success")) {
+            throw IllegalStateException(result.optString("error", "OTA begin rejected"))
+        }
+        return true
+    }
+
+    suspend fun otaChunk(chunk: ByteArray, offset: Int): Int {
+        val encoded = Base64.encodeToString(chunk, Base64.NO_WRAP)
+        val payload = JSONObject().put("offset", offset).put("data", encoded).toString()
+        val fullLen = 4 + "ota.data:".length + payload.toByteArray(Charsets.UTF_8).size
+        if (fullLen > negotiatedMtu - 3) {
+            throw IllegalStateException(
+                "BLE MTU too small (mtu=$negotiatedMtu, need ${fullLen + 3}). Reconnect BLE.")
+        }
+        val result = JSONObject(rpc("ota.data", payload))
+        if (!result.optBoolean("success")) {
+            return result.optInt("written", -1)
+        }
+        return result.optInt("written", 0)
+    }
+
+    fun otaChunkNoWait(chunk: ByteArray, offset: Int): Boolean {
+        val encoded = Base64.encodeToString(chunk, Base64.NO_WRAP)
+        val payload = JSONObject().put("offset", offset).put("data", encoded).toString()
+        return sendOtaDataNoResponse("rpc:ota.data:$payload")
+    }
+
+    suspend fun otaEnd(): Boolean {
+        val result = JSONObject(rpc("ota.end"))
+        if (!result.optBoolean("success")) {
+            throw IllegalStateException(result.optString("error", "OTA end rejected"))
+        }
+        return true
+    }
+
+    suspend fun otaAbort() {
+        runCatching { rpc("ota.abort") }
+    }
+
+    suspend fun otaStatus(): Triple<Boolean, Int, Int> {
+        val json = JSONObject(rpc("ota.status"))
+        return Triple(json.optBoolean("active"), json.optInt("written"), json.optInt("total"))
+    }
+
+
+    suspend fun slaveOtaBegin(totalSize: Int): Boolean {
+        val payload = JSONObject().put("size", totalSize).toString()
+        val result = JSONObject(rpc("slave_ota.begin", payload))
+        if (!result.optBoolean("success")) {
+            throw IllegalStateException(result.optString("error", "Slave OTA begin rejected"))
+        }
+        return true
+    }
+
+    suspend fun slaveOtaChunk(chunk: ByteArray, offset: Int): Int {
+        val encoded = Base64.encodeToString(chunk, Base64.NO_WRAP)
+        val payload = JSONObject().put("offset", offset).put("data", encoded).toString()
+        val fullLen = 4 + "slave_ota.data:".length + payload.toByteArray(Charsets.UTF_8).size
+        if (fullLen > negotiatedMtu - 3) {
+            throw IllegalStateException("BLE MTU too small for slave OTA chunk")
+        }
+        val result = JSONObject(rpc("slave_ota.data", payload))
+        return if (result.optBoolean("success")) result.optInt("written", -1) else -1
+    }
+
+    suspend fun slaveOtaStart(): Boolean {
+        val result = JSONObject(rpc("slave_ota.start"))
+        if (!result.optBoolean("success")) {
+            throw IllegalStateException(result.optString("error", "Slave OTA start rejected"))
+        }
+        return true
+    }
+
+    suspend fun slaveOtaAbort() {
+        runCatching { rpc("slave_ota.abort") }
+    }
+
+    suspend fun slaveOtaStatus(): Triple<Int, Int, Int> {
+        val json = JSONObject(rpc("slave_ota.status"))
+        return Triple(json.optInt("state", 0), json.optInt("written", 0), json.optInt("sent", 0))
+    }
+
+
+    data class FileOtaStatus(
+        val state: Int,
+        val target: Int,
+        val written: Int,
+        val total: Int,
+        val applied: Int,
+        val error: String
+    )
+
+    suspend fun fileOtaBegin(totalSize: Int, target: String): Boolean {
+        val payload = JSONObject().put("size", totalSize).put("target", target).toString()
+        val result = JSONObject(rpc("file.begin", payload))
+        if (!result.optBoolean("success")) {
+            throw IllegalStateException(result.optString("error", "File OTA begin rejected"))
+        }
+        return true
+    }
+
+    suspend fun fileOtaChunk(chunk: ByteArray, offset: Int): Int {
+        val encoded = Base64.encodeToString(chunk, Base64.NO_WRAP)
+        val payload = JSONObject().put("offset", offset).put("data", encoded).toString()
+        val fullLen = 4 + "file.data:".length + payload.toByteArray(Charsets.UTF_8).size
+        lastChunkCommandBytes = fullLen
+        val limit = maxCommandBytes()
+        if (fullLen > limit) {
+            throw IllegalStateException(
+                "Chunk command of $fullLen B does not fit into $limit B (mtu=$negotiatedMtu)"
+            )
+        }
+        val result = JSONObject(rpc("file.data", payload))
+        if (result.optBoolean("success")) {
+            lastFileOtaError = ""
+            lastFileOtaTruncated = false
+            return result.optInt("written", -1)
+        }
+        lastFileOtaError = result.optString("error", "")
+        val received = result.optInt("payload_len", -1)
+        lastFileOtaTruncated = received in 1 until payload.length
+        if (lastFileOtaTruncated) {
+            // The device received only `received + "file.data:".length + "rpc:".length`
+            // bytes of our command: never send more than that again.
+            observedCommandBytes = received + "file.data:".length + 4
+            if (received <= 30) {
+                // Writes are being cut down to the ATT minimum: our cached MTU is wrong.
+                negotiatedMtu = 23
+            }
+        }
+        Timber.w(
+            "file.data rejected at $offset: '$lastFileOtaError' " +
+                "(device got $received of ${payload.length} bytes)"
+        )
+        return -1
+    }
+
+    suspend fun fileOtaFinish(): Boolean {
+        val result = JSONObject(rpc("file.finish"))
+        if (!result.optBoolean("success")) {
+            throw IllegalStateException(result.optString("error", "File OTA finish rejected"))
+        }
+        return true
+    }
+
+    suspend fun fileOtaAbort() {
+        runCatching { rpc("file.abort") }
+    }
+
+    suspend fun fileOtaStatus(): FileOtaStatus {
+        val json = JSONObject(rpc("file.status"))
+        return FileOtaStatus(
+            state = json.optInt("state", 0),
+            target = json.optInt("target", 0),
+            written = json.optInt("written", 0),
+            total = json.optInt("total", 0),
+            applied = json.optInt("applied", 0),
+            error = json.optString("error", "")
+        )
     }
 
     suspend fun getSystemLogs(): String = rpc("logs.get")
@@ -475,6 +731,8 @@ class BlePlayerClient(context: Context) {
         
         bluetoothGatt?.close()
         bluetoothGatt = device.connectGatt(context, false, gattCallback)
+        reconnectHandler.removeCallbacks(reconnectWatchdog)
+        reconnectHandler.postDelayed(reconnectWatchdog, 4000)
         connectedDevice = device
         
         return bluetoothGatt != null
@@ -488,8 +746,13 @@ class BlePlayerClient(context: Context) {
             return false
         }
         val address = preferences.getString("device_address", null) ?: return false
-        if (bluetoothGatt != null && (_isConnected.value || bluetoothGatt?.device?.address == address)) {
+        if (bluetoothGatt != null && _isConnected.value) {
             return true
+        }
+        if (bluetoothGatt != null) {
+            Timber.d("BLE: closing stale GATT before reconnect")
+            bluetoothGatt?.close()
+            bluetoothGatt = null
         }
         val device = try {
             bluetoothAdapter?.getRemoteDevice(address)
@@ -501,6 +764,12 @@ class BlePlayerClient(context: Context) {
     }
 
     fun hasRememberedDevice(): Boolean = preferences.getString("device_address", null) != null
+
+    fun currentDeviceLabel(): String {
+        val name = connectedDevice?.name
+        if (!name.isNullOrBlank()) return name
+        return preferences.getString("device_address", null) ?: tr("Не вибрано")
+    }
 
     /**
      * Від'єднання
@@ -525,6 +794,206 @@ class BlePlayerClient(context: Context) {
      * Відправка команди
      */
     @SuppressLint("MissingPermission")
+    fun maxOtaChunkSize(): Int {
+        var attPayload = (negotiatedMtu - 3).coerceAtLeast(20)
+        val observed = observedCommandBytes
+        if (observed in 1 until attPayload) {
+            attPayload = observed
+        }
+        // "rpc:" + "file.data:" + {"offset":NNNNNNN,"data":"BASE64"}
+        val overhead = 4 + 9 + 10 + 7 + 9 + 2
+        val b64Budget = attPayload - overhead
+        if (b64Budget < 24) return 16
+        return ((b64Budget / 4) * 3).coerceAtLeast(16).coerceAtMost(340)
+    }
+
+    /** How many bytes of a command the device can really receive (0 = unknown). */
+    fun commandCapacity(): Int = observedCommandBytes
+
+    fun resetCommandCapacity() {
+        observedCommandBytes = 0
+    }
+
+    /**
+     * Re-runs the ATT MTU exchange. Used when the device reports that it got a
+     * truncated command, which means our cached MTU is stale (after a silent
+     * reconnection) and the stack is cutting every write down to few bytes.
+     */
+    @SuppressLint("MissingPermission")
+    suspend fun renegotiateMtu(timeoutMs: Long = 3000): Int {
+        val gatt = bluetoothGatt ?: return negotiatedMtu
+        negotiatedMtu = 23
+        observedCommandBytes = 0
+        if (!gatt.requestMtu(512)) {
+            Timber.w("BLE MTU renegotiation could not be started")
+            return negotiatedMtu
+        }
+        val start = android.os.SystemClock.elapsedRealtime()
+        while (negotiatedMtu < 100 &&
+            android.os.SystemClock.elapsedRealtime() - start < timeoutMs
+        ) {
+            delay(50)
+        }
+        Timber.d("BLE MTU after renegotiation: $negotiatedMtu")
+        return negotiatedMtu
+    }
+
+    /** Drops the link and reconnects (used when the MTU cannot be restored). */
+    @SuppressLint("MissingPermission")
+    suspend fun forceReconnect(timeoutMs: Long = 12000): Boolean {
+        val address = preferences.getString("device_address", null) ?: return false
+        val device = try {
+            bluetoothAdapter?.getRemoteDevice(address)
+        } catch (e: IllegalArgumentException) {
+            null
+        } ?: return false
+
+        Timber.w("BLE: forcing reconnect to $address")
+        runCatching { bluetoothGatt?.disconnect() }
+        runCatching { bluetoothGatt?.close() }
+        bluetoothGatt = null
+        _isConnected.value = false
+        _serviceReady.value = false
+        _notificationsReady.value = false
+        negotiatedMtu = 23
+        servicesDiscovered = false
+
+        manualReconnectInProgress = true
+        try {
+            if (!connect(device)) return false
+            val start = android.os.SystemClock.elapsedRealtime()
+            while (android.os.SystemClock.elapsedRealtime() - start < timeoutMs) {
+                if (_notificationsReady.value) return true
+                delay(150)
+            }
+            return _serviceReady.value
+        } finally {
+            manualReconnectInProgress = false
+        }
+    }
+
+    /** Hard cap for a single command: ATT limit, but never more than the device accepts. */
+    fun maxCommandBytes(): Int {
+        val att = (negotiatedMtu - 3).coerceAtLeast(20)
+        val observed = observedCommandBytes
+        return if (observed in 1 until att) observed else att
+    }
+
+    /** Size of the last `file.data` command that was built (for error messages). */
+    @Volatile var lastChunkCommandBytes: Int = 0
+        private set
+
+    fun currentMtu(): Int = negotiatedMtu
+
+    suspend fun ensureMtu(timeoutMs: Long = 2500): Int {
+        val gatt = bluetoothGatt ?: return negotiatedMtu
+        if (negotiatedMtu >= 100) return negotiatedMtu
+        gatt.requestMtu(512)
+        val start = System.currentTimeMillis()
+        while (negotiatedMtu < 100 && System.currentTimeMillis() - start < timeoutMs) {
+            delay(50)
+        }
+        return negotiatedMtu
+    }
+
+    fun sendOtaDataNoResponse(fullCommand: String): Boolean {
+        if (!_isConnected.value || commandCharacteristic == null) return false
+        val bytes = fullCommand.toByteArray(Charsets.UTF_8)
+        if (bytes.size > negotiatedMtu - 3) {
+            Timber.e("BLE OTA chunk too large: ${bytes.size} > ${negotiatedMtu - 3} (mtu=$negotiatedMtu)")
+            return false
+        }
+        synchronized(otaWriteLock) {
+            pendingOtaWrites.addLast(bytes)
+        }
+        startNextOtaWrite()
+        return true
+    }
+
+    fun isOtaWriteIdle(): Boolean = synchronized(otaWriteLock) {
+        !otaWriteInProgress && pendingOtaWrites.isEmpty()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startNextOtaWrite() {
+        val gatt = bluetoothGatt
+        val characteristic = commandCharacteristic
+        if (gatt == null || characteristic == null) {
+            synchronized(otaWriteLock) { otaWriteInProgress = false }
+            return
+        }
+        synchronized(writeArbiter) {
+            if (commandWriteInProgress) {
+                mainHandler.postDelayed({ startNextOtaWrite() }, 3)
+                return
+            }
+            val bytes = synchronized(otaWriteLock) {
+                if (otaWriteInProgress) return
+                val next = pendingOtaWrites.pollFirst() ?: return
+                otaWriteInProgress = true
+                next
+            }
+            writeFrame(gatt, characteristic, bytes)
+        }
+    }
+
+    private fun writeFrame(
+        gatt: android.bluetooth.BluetoothGatt,
+        characteristic: android.bluetooth.BluetoothGattCharacteristic,
+        bytes: ByteArray
+    ) {
+        characteristic.value = bytes
+        characteristic.writeType = WRITE_TYPE_NO_RESPONSE
+        if (!gatt.writeCharacteristic(characteristic)) {
+            // Controller is busy: retry the same frame shortly, keep it unacknowledged.
+            mainHandler.postDelayed({
+                synchronized(otaWriteLock) {
+                    otaWriteInProgress = false
+                    pendingOtaWrites.addFirst(bytes)
+                }
+                startNextOtaWrite()
+            }, 5)
+            return
+        }
+        // Watchdog: some stacks never call onCharacteristicWrite for WRITE_NR
+        mainHandler.postDelayed({
+            if (otaWriteInProgress) {
+                synchronized(otaWriteLock) { otaWriteInProgress = false }
+                startNextOtaWrite()
+            }
+        }, 15)
+    }
+
+    /**
+     * Sends one binary OTA frame: [0xA5][0x01][offset:4 LE][len:2 LE][payload].
+     * Uses Write Without Response, so there is no RPC round trip per chunk.
+     */
+    fun otaSendFrame(offset: Int, data: ByteArray): Boolean {
+        if (!_isConnected.value || commandCharacteristic == null) {
+            throw IllegalStateException("BLE is not connected")
+        }
+        val frame = ByteArray(data.size + 8)
+        frame[0] = 0xA5.toByte()
+        frame[1] = 0x01
+        frame[2] = (offset and 0xFF).toByte()
+        frame[3] = ((offset ushr 8) and 0xFF).toByte()
+        frame[4] = ((offset ushr 16) and 0xFF).toByte()
+        frame[5] = ((offset ushr 24) and 0xFF).toByte()
+        frame[6] = (data.size and 0xFF).toByte()
+        frame[7] = ((data.size ushr 8) and 0xFF).toByte()
+        System.arraycopy(data, 0, frame, 8, data.size)
+
+        val limit = maxCommandBytes()
+        if (frame.size > limit) {
+            throw IllegalStateException(
+                "OTA frame of ${frame.size} B does not fit into $limit B (mtu=$negotiatedMtu)"
+            )
+        }
+        synchronized(otaWriteLock) { pendingOtaWrites.addLast(frame) }
+        startNextOtaWrite()
+        return true
+    }
+
     fun sendCommand(command: String, params: String = ""): Boolean {
         if (!_isConnected.value || commandCharacteristic == null) {
             Timber.w("❌ BLE not connected or characteristic not found")
@@ -543,17 +1012,34 @@ class BlePlayerClient(context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun startNextCommandWrite() {
+        val gatt = bluetoothGatt
+        val characteristic = commandCharacteristic
+        if (gatt == null || characteristic == null) {
+            synchronized(commandWriteLock) { commandWriteInProgress = false }
+            return
+        }
+        synchronized(writeArbiter) {
+        if (otaWriteInProgress || synchronized(otaWriteLock) { pendingOtaWrites.isNotEmpty() }) {
+            mainHandler.postDelayed({ startNextCommandWrite() }, 3)
+            return
+        }
         val commandBytes = synchronized(commandWriteLock) {
             if (commandWriteInProgress) return
             val next = pendingCommandWrites.pollFirst() ?: return
             commandWriteInProgress = true
             next
         }
-
-        val gatt = bluetoothGatt
-        val characteristic = commandCharacteristic
-        if (gatt == null || characteristic == null) {
+        val limit = maxCommandBytes()
+        if (commandBytes.size > limit) {
+            Timber.e("BLE command too large: ${commandBytes.size} B (limit $limit B, mtu=$negotiatedMtu)")
+            pendingRpcResponse?.completeExceptionally(
+                IllegalStateException(
+                    "BLE command of ${commandBytes.size} B exceeds the limit of $limit B " +
+                        "(mtu=$negotiatedMtu); chunk size must be reduced"
+                )
+            )
             synchronized(commandWriteLock) { commandWriteInProgress = false }
+            startNextCommandWrite()
             return
         }
         characteristic.value = commandBytes
@@ -561,7 +1047,8 @@ class BlePlayerClient(context: Context) {
         if (!gatt.writeCharacteristic(characteristic)) {
             Timber.e("❌ Could not start BLE command write")
             synchronized(commandWriteLock) { commandWriteInProgress = false }
-            startNextCommandWrite()
+            mainHandler.postDelayed({ startNextCommandWrite() }, 5)
+        }
         }
     }
 
@@ -621,19 +1108,25 @@ class BlePlayerClient(context: Context) {
     }
     
     suspend fun getPlaylist(): List<String> {
-        _playlistData.value = emptyList()  // очистити старі дані
-        sendCommand("playlist")
-        
-        // Чекати до 2 секунд на відповідь від ESP32
-        repeat(20) {
-            if (_playlistData.value.isNotEmpty()) {
-                return _playlistData.value
+        val result = mutableListOf<String>()
+        var offset = 0
+        var guard = 0
+        while (guard++ < 300) {
+            val payload = JSONObject().put("offset", offset).put("count", 3).toString()
+            val json = JSONObject(rpc("playlist.get", payload))
+            val total = json.optInt("total", 0)
+            val items = json.optJSONArray("items")
+            if (items != null) {
+                for (i in 0 until items.length()) {
+                    result.add(items.optString(i))
+                }
             }
-            delay(100)
+            val next = json.optInt("next", offset)
+            if (next <= offset || next >= total) break
+            offset = next
         }
-        
-        Timber.w("⚠️ Playlist timeout, returning empty")
-        return emptyList()
+        _playlistData.value = result
+        return result
     }
     
 }

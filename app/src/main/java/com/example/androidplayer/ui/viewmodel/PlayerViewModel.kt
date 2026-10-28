@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
+import com.example.androidplayer.ui.i18n.tr
+import com.example.androidplayer.service.PlaybackService
 
 /**
  * Главный ViewModel для управления плеером
@@ -23,6 +25,24 @@ class PlayerViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    init {
+        // Mirror the device state into the media notification (mini player).
+        viewModelScope.launch {
+            _uiState.collect { state ->
+                val name = state.playlist.getOrNull(state.currentTrack)
+                    ?.substringAfterLast('/')
+                    ?.substringBeforeLast('.')
+                    ?: com.example.androidplayer.ui.i18n.Loc.trackTitle(state.currentTrack + 1)
+                PlaybackService.update(
+                    name,
+                    state.isPaused,
+                    state.positionMs.toLong(),
+                    state.durationMs.toLong()
+                )
+            }
+        }
+    }
     
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -93,7 +113,7 @@ class PlayerViewModel @Inject constructor(
                     Timber.d("Player status loaded: $status")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка загрузки статуса: ${error.message}"
+                    _error.value = tr("Помилка завантаження статусу: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to load player status")
                 }
             )
@@ -133,7 +153,7 @@ class PlayerViewModel @Inject constructor(
                     Timber.d("Playing track: $trackIndex")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка воспроизведения: ${error.message}"
+                    _error.value = tr("Помилка відтворення: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to play track")
                 }
             )
@@ -154,7 +174,7 @@ class PlayerViewModel @Inject constructor(
                     Timber.d("Toggled playback: $command")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка управления воспроизведением: ${error.message}"
+                    _error.value = tr("Помилка керування відтворенням: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to toggle playback")
                 }
             )
@@ -177,7 +197,7 @@ class PlayerViewModel @Inject constructor(
                     Timber.d("Next track")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка переключения трека: ${error.message}"
+                    _error.value = tr("Помилка перемикання треку: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to play next track")
                 }
             )
@@ -200,7 +220,7 @@ class PlayerViewModel @Inject constructor(
                     Timber.d("Previous track")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка переключения трека: ${error.message}"
+                    _error.value = tr("Помилка перемикання треку: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to play previous track")
                 }
             )
@@ -221,7 +241,7 @@ class PlayerViewModel @Inject constructor(
                     Timber.d("Switched mode to: $newMode")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка переключения режима: ${error.message}"
+                    _error.value = tr("Помилка перемикання режиму: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to switch mode")
                 }
             )
@@ -239,7 +259,7 @@ class PlayerViewModel @Inject constructor(
                     Timber.d("Position set to: $positionMs ms")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка перемотки: ${error.message}"
+                    _error.value = tr("Помилка перемотування: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to set position")
                 }
             )
@@ -258,7 +278,7 @@ class PlayerViewModel @Inject constructor(
                     Timber.d("Sniffer toggled to: ${!currentState.snifferEnabled}")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка управления CAN-Sniffer: ${error.message}"
+                    _error.value = tr("Помилка керування CAN-Sniffer: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to toggle sniffer")
                 }
             )

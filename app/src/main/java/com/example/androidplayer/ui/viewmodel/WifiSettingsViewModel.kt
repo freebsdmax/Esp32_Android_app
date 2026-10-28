@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.androidplayer.data.model.*
 import com.example.androidplayer.data.repository.Esp32PlayerRepository
+import com.example.androidplayer.data.ble.BlePlayerClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
+import com.example.androidplayer.ui.i18n.tr
 
 /**
  * ViewModel для настроек Wi-Fi
@@ -18,7 +20,22 @@ import javax.inject.Inject
 @HiltViewModel
 class WifiSettingsViewModel @Inject constructor(
     private val repository: Esp32PlayerRepository
+,
+    private val bleClient: BlePlayerClient
 ) : ViewModel() {
+    init {
+        viewModelScope.launch {
+            var wasReady = bleClient.serviceReady.value
+            bleClient.serviceReady.collect { ready ->
+                if (ready && !wasReady) {
+                    Timber.d("BLE reconnected: refreshing WifiSettings")
+                    loadWifiSettings()
+                }
+                wasReady = ready
+            }
+        }
+    }
+
     
     private val _uiState = MutableStateFlow(WifiSettingsUiState())
     val uiState: StateFlow<WifiSettingsUiState> = _uiState.asStateFlow()
@@ -53,7 +70,7 @@ class WifiSettingsViewModel @Inject constructor(
                     Timber.d("WiFi settings loaded: mode=${settings.mode}")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка загрузки настроек Wi-Fi: ${error.message}"
+                    _error.value = tr("Помилка завантаження налаштувань Wi-Fi: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to load WiFi settings")
                 }
             )
@@ -118,12 +135,12 @@ class WifiSettingsViewModel @Inject constructor(
                 onSuccess = { response ->
                     _uiState.value = currentState.copy(
                         isSaved = true,
-                        saveMessage = "Настройки сохранены. Перезагрузите устройство для применения."
+                        saveMessage = tr("Налаштування збережено. Перезавантажте пристрій для застосування.")
                     )
                     Timber.d("WiFi settings saved")
                 },
                 onFailure = { error ->
-                    _error.value = "Ошибка сохранения настроек: ${error.message}"
+                    _error.value = tr("Помилка збереження налаштувань: %s").format(error.message ?: error.toString())
                     Timber.e(error, "Failed to save WiFi settings")
                 }
             )

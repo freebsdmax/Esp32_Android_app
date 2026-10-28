@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.androidplayer.data.model.*
 import com.example.androidplayer.data.repository.Esp32PlayerRepository
+import com.example.androidplayer.data.ble.BlePlayerClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
+import com.example.androidplayer.ui.i18n.tr
 
 /**
  * ViewModel для мониторинга системы
@@ -18,7 +20,22 @@ import javax.inject.Inject
 @HiltViewModel
 class SystemMonitorViewModel @Inject constructor(
     private val repository: Esp32PlayerRepository
+,
+    private val bleClient: BlePlayerClient
 ) : ViewModel() {
+    init {
+        viewModelScope.launch {
+            var wasReady = bleClient.serviceReady.value
+            bleClient.serviceReady.collect { ready ->
+                if (ready && !wasReady) {
+                    Timber.d("BLE reconnected: refreshing SystemMonitor")
+                    loadSystemLogs(); loadSystemInfo(); loadCanStatistics(); loadCurrentLogSettings()
+                }
+                wasReady = ready
+            }
+        }
+    }
+
     
     private val _uiState = MutableStateFlow(SystemMonitorUiState())
     val uiState: StateFlow<SystemMonitorUiState> = _uiState.asStateFlow()
@@ -56,7 +73,7 @@ class SystemMonitorViewModel @Inject constructor(
                     },
                     onFailure = { error ->
                         Timber.e(error, "Failed to load system logs")
-                        _error.value = "Ошибка загрузки логов: ${error.message}"
+                        _error.value = tr("Помилка завантаження логів: %s").format(error.message ?: error.toString())
                     }
                 )
             } finally {
@@ -188,7 +205,7 @@ class SystemMonitorViewModel @Inject constructor(
             
             val hasErrors = results.any { it.isFailure }
             if (hasErrors) {
-                _error.value = "Ошибка сохранения настроек логирования"
+                _error.value = tr("Помилка збереження налаштувань логування")
                 Timber.e("Failed to update log settings")
             } else {
                 _uiState.value = _uiState.value.copy(
@@ -242,21 +259,21 @@ class SystemMonitorViewModel @Inject constructor(
      * Форматирование системной информации для отображения
      */
     fun getFormattedSystemInfo(): String {
-        val systemInfo = _uiState.value.systemInfo ?: return "Нет данных"
+        val systemInfo = _uiState.value.systemInfo ?: return tr("Немає даних")
         
         return buildString {
-            appendLine("=== ИНФОРМАЦИЯ О СИСТЕМЕ ===")
-            appendLine("Версия прошивки: ${systemInfo.firmwareVersion}")
-            appendLine("Дата сборки: ${systemInfo.buildDate} ${systemInfo.buildTime}")
+            appendLine(tr("=== ІНФОРМАЦІЯ ПРО СИСТЕМУ ==="))
+            appendLine(tr("Версія прошивки: %s").format(systemInfo.firmwareVersion))
+            appendLine(tr("Дата збірки: %s %s").format(systemInfo.buildDate, systemInfo.buildTime))
             appendLine()
-            appendLine("=== ПАМЯТЬ ===")
-            appendLine("Heap: ${formatBytes(systemInfo.freeHeap.toLong())} свободно из ${formatBytes(systemInfo.totalHeap.toLong())}")
+            appendLine(tr("=== ПАМ'ЯТЬ ==="))
+            appendLine(tr("Heap: %s вільно з %s").format(formatBytes(systemInfo.freeHeap.toLong()), formatBytes(systemInfo.totalHeap.toLong())))
             if (systemInfo.freePsram != null && systemInfo.totalPsram != null) {
-                appendLine("PSRAM: ${formatBytes(systemInfo.freePsram.toLong())} свободно из ${formatBytes(systemInfo.totalPsram.toLong())}")
+                appendLine(tr("PSRAM: %s вільно з %s").format(formatBytes(systemInfo.freePsram.toLong()), formatBytes(systemInfo.totalPsram.toLong())))
             }
             appendLine()
-            appendLine("=== ВРЕМЯ РАБОТЫ ===")
-            appendLine("Время работы: ${formatUptime(systemInfo.uptimeMs)}")
+            appendLine(tr("=== ЧАС РОБОТИ ==="))
+            appendLine(tr("Час роботи: %s").format(formatUptime(systemInfo.uptimeMs)))
         }
     }
     
@@ -264,15 +281,15 @@ class SystemMonitorViewModel @Inject constructor(
      * Форматирование статистики CAN
      */
     fun getFormattedCanStatistics(): String {
-        val canStats = _uiState.value.canStatistics ?: return "Нет данных"
+        val canStats = _uiState.value.canStatistics ?: return tr("Немає даних")
         
         return buildString {
-            appendLine("=== CAN СТАТИСТИКА ===")
-            appendLine("Кадров в секунду: ${canStats.framesPerSecond}")
-            appendLine("Байт в секунду: ${formatBytes(canStats.bytesPerSecond.toLong())}")
-            appendLine("Всего кадров: ${canStats.totalFrames}")
-            appendLine("Всего байт: ${formatBytes(canStats.totalBytes)}")
-            appendLine("Скорость CAN: ${canStats.bitrate} кбит/с")
+            appendLine(tr("=== CAN СТАТИСТИКА ==="))
+            appendLine(tr("Кадрів за секунду: %d").format(canStats.framesPerSecond))
+            appendLine(tr("Байт за секунду: %s").format(formatBytes(canStats.bytesPerSecond.toLong())))
+            appendLine(tr("Всього кадрів: %d").format(canStats.totalFrames))
+            appendLine(tr("Всього байт: %s").format(formatBytes(canStats.totalBytes)))
+            appendLine(tr("Швидкість CAN: %d кбіт/с").format(canStats.bitrate))
         }
     }
     
@@ -281,9 +298,9 @@ class SystemMonitorViewModel @Inject constructor(
      */
     private fun formatBytes(bytes: Long): String {
         return when {
-            bytes < 1024 -> "$bytes Б"
-            bytes < 1024 * 1024 -> "${bytes / 1024} КБ"
-            else -> "${bytes / (1024 * 1024)} МБ"
+            bytes < 1024 -> tr("%d Б").format(bytes)
+            bytes < 1024 * 1024 -> tr("%d КБ").format(bytes / 1024)
+            else -> tr("%d МБ").format(bytes / (1024 * 1024))
         }
     }
     
@@ -297,10 +314,10 @@ class SystemMonitorViewModel @Inject constructor(
         val days = hours / 24
         
         return when {
-            days > 0 -> "$days дн ${hours % 24} ч"
-            hours > 0 -> "$hours ч ${minutes % 60} мин"
-            minutes > 0 -> "$minutes мин ${seconds % 60} сек"
-            else -> "$seconds сек"
+            days > 0 -> tr("%d дн %d ч").format(days, hours % 24)
+            hours > 0 -> tr("%d ч %d хв").format(hours, minutes % 60)
+            minutes > 0 -> tr("%d хв %d с").format(minutes, seconds % 60)
+            else -> tr("%d с").format(seconds)
         }
     }
     

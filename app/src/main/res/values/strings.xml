@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ESP32 Player Control</string>
-    <string name="player_title">ESP32 Music Player</string>
+    <string name="app_name">Ford Player</string>
+    <string name="player_title">Ford Player</string>
     <string name="wifi_settings">Wi-Fi Settings</string>
     <string name="ota_updates">OTA Updates</string>
     <string name="system_monitor">System Monitor</string>

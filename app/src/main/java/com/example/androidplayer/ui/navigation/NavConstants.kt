@@ -24,6 +24,7 @@ object NavArguments {
  */
 object NavRoutes {
     const val PLAYER = "/player"
+    const val PLAYLIST = "/playlist"
     const val SETTINGS = "/settings"
     const val WIFI_SETTINGS = "/wifi_settings"
     const val OTA = "/ota"

@@ -1,83 +1,155 @@
-# ESP32 Music Player Control (Android-додаток)
+# Ford Player — Android
 
-Android-додаток для керування MP3-плеєром на базі ESP32 (проєкт **Ford-DensO-mp3**).
+Застосунок керування системою **Ford Player** (ESP32-S3 + Bluetooth-модуль).
+Працює **тільки через BLE** — Wi-Fi у застосунку не використовується.
 
-## Можливості
+<p align="center">
+  <b>Плеєр · Плейлист · OTA · Логи</b><br>
+  <i>UK / EN інтерфейс, міні-плеєр у шторці, OTA Master і Slave</i>
+</p>
 
-- **Плеєр** — керування відтворенням (play/pause/наступний/попередній), вибір треку з плейлиста, перемотка по треку.
-- **Режими** — перемикання між режимом USB/носія та зовнішнім I2S-входом.
-- **CAN-Sniffer** — увімкнення/вимкнення Wi-Fi CAN-Sniffer із відображенням стану.
-- **Wi-Fi** — налаштування підключення ESP32 у режимах AP/STA, збереження SSID та пароля.
-- **OTA-оновлення** — оновлення прошивки Master ESP32 та Slave ESP32 через UART блоками по 240 байт.
-- **Системний монітор** — інформація про систему, статистика CAN, перегляд та керування логами.
-- **BLE** — підтримка підключення по BLE (за наявності на пристрої).
+---
 
-## Технології
+## Вимоги
 
-- **Kotlin** + **Jetpack Compose** (Material 3)
-- **Hilt** — впровадження залежностей
-- **Retrofit/OkHttp** — робота по HTTP
-- **Coroutines/Flow** — асинхронна робота
-- **Navigation Compose** — навігація
-- **Timber** — логування
-- **BLE** (Android Bluetooth API) — підключення по BLE
+| | |
+|---|---|
+| Android | **8.0 (API 26)** і вище |
+| Дозволи | Bluetooth (Scan/Connect), **сповіщення** (Android 13+) |
+| Пристрій | Ford Player Master з прошивкою, що підтримує BLE-RPC |
+
+При першому запуску застосунок попросить дозвіл на сповіщення — без нього
+не буде ні міні-плеєра, ні повідомлень про помилки.
+
+## Що вміє
+
+### 🎵 Плеєр
+- відтворення / пауза, наступний / попередній трек, перемотування;
+- назва треку, позиція, режим (USB / external-Bluetooth);
+- індикатор з'єднання у верхній панелі.
+
+### 📜 Плейлист
+- список треків з флешки, вибір треку тапом, поточна позиція виділена.
+
+### 💾 OTA
+- **Master**: вибір `.bin` → завантаження по BLE → пристрій перезавантажується;
+- **Slave**: вибір `.bin` → образ іде на Master, далі по UART у Slave;
+- прогрес, **швидкість (КБ/с)** і **приблизний залишок часу**;
+- фази окремо: *передача* та *запис у flash*;
+- при збої — **конкретна причина** (не просто «помилка»):
+  `Device failed: incomplete upload`, `File OTA rejected at 223200: …`,
+  `BLE MTU could not be restored`, `Device lost the update session`.
+
+### 📋 Логи
+- системна інформація (прошивка, heap, PSRAM, uptime);
+- статистика CAN;
+- **логи за модулями** (5 перемикачів): 🎵 Плеєр · 📡 Зв'язок · 💾 OTA · 🚗 Авто · ⚙️ Система;
+- рівень логування та verbose-режим;
+- перегляд логів пристрою.
+
+### 🔔 Сповіщення
+- **міні-плеєр** у шторці (як у YouTube Music): назва треку, ⏮ / ⏯ / ⏭,
+  керує платою по BLE; живе, поки є з'єднання;
+- усі повідомлення застосунку дублюються в шторку (помилки, успіх, стан з'єднання);
+- прогрес і результат OTA — окремими сповіщеннями.
 
 ## Збірка
 
-### Вимоги
+Потрібні **JDK 17** і **Android SDK 34**.
 
-- **Android Studio** (рекомендовано останню стабільну версію) або **Android SDK Command Line Tools**
-- **JDK 17**
-- **Android SDK** (compileSdk 34, minSdk 26)
+```powershell
+cd D:\emulators\Ford-DensO-mp3-master\AndroidPlayer
 
-### Збірка через Android Studio
+# SDK path (один раз)
+# local.properties: sdk.dir=C\:\\Users\\<user>\\AppData\\Local\\Android\\Sdk
 
-1. Відкрити `D:\emulators\Ford-DensO-mp3-master\AndroidPlayer` в Android Studio.
-2. Дочекатись синхронізації Gradle.
-3. `Build > Build Bundle(s) / APK(s) > Build APK(s)` або запустити `Run` на пристрої/емуляторі.
+.\gradlew.bat assembleDebug
+```
 
-### Збірка через консоль
+APK: `app/build/outputs/apk/debug/app-debug.apk`
+
+Встановлення:
+
+```powershell
+adb uninstall com.example.androidplayer
+adb install app\build\outputs\apk\debug\app-debug.apk
+```
+
+> `versionCode` завжди `1`, тому при оновленні краще робити `uninstall` —
+> інакше Android може залишити стару версію.
+
+## Архітектура
+
+```
+ui/
+  screens/      Player, Playlist, Ota, SystemMonitor (логи), Settings, BleDiscovery
+  viewmodel/    PlayerVM, OtaVM, SystemMonitorVM, SettingsVM
+  i18n/Loc.kt   словник UK/EN (рядки + форматери)
+  notify/       AppNotify (повідомлення в шторку)
+service/
+  PlaybackService.kt   MediaSession + MediaStyle (міні-плеєр)
+ota/
+  OtaNotifications.kt, OtaUploadService.kt   прогрес/результат OTA
+data/
+  ble/BlePlayerClient.kt        GATT-клієнт, RPC, OTA-кадри, MTU
+  repository/Esp32PlayerRepository.kt
+  model/                        моделі стану й налаштувань
+```
+
+- **MVVM + Hilt**, Kotlin Coroutines + Flow, Jetpack Compose (Material 3).
+- Транспорт — `BlePlayerClient` (синглтон), репозиторій серіалізує OTA м'ютексом.
+
+## BLE-протокол (що використовує застосунок)
+
+Сервіс `11000000-0000-1000-8000-00805f9b34fb`:
+
+| Характеристика | UUID | Призначення |
+|---|---|---|
+| Command | `11010100-…` | запити (write / write-no-response) |
+| Status | `11010200-…` | стан плеєра (notify) |
+| Playlist | `11010300-…` | плейлист (notify) |
+| Logs | `11010400-…` | відповіді RPC (notify) |
+
+- Текстові запити: `rpc:<команда>[:<json>]`, відповідь — JSON.
+- MTU: запитується 512 (корисно 509 Б).
+- **OTA Master/Slave**: `file.begin` → бінарні кадри
+  `[0xA5][0x01][offset:4][len:2][data]` через Write Without Response → `file.finish`.
+- Застосунок сам відновлює MTU/з'єднання, якщо телефон почав різати записи.
+
+## Мова
+
+Інтерфейс — **українська**, якщо системна мова `uk`, інакше **англійська**.
+Усі рядки проходять через `Loc.tr()`; дати/розміри/час форматуються окремими
+хелперами (`sizeText`, `speedText`, `etaText`, `durationText`).
+
+## Релізи
+
+GitHub Actions (`.github/workflows/release.yml`) збирає APK і публікує реліз
+при пуші тега:
 
 ```bash
-cd D:\emulators\Ford-DensO-mp3-master\AndroidPlayer
-.\gradlew.bat assembleDebug
-# або
-.\gradlew.bat installDebug
+git add .
+git commit -m "release: v1.1.0"
+git push
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
-Готовий APK: `app/build/outputs/apk/debug/app-debug.apk`
+Артефакт: `Ford-Player-vX.Y.Z.apk` (debug-підпис).
 
-### Налаштування SDK (за потреби)
-
-Створи файл `local.properties` в корені модуля `AndroidPlayer/`:
-
-```properties
-sdk.dir=C:\\Users\\<Ім'яКористувача>\\AppData\\Local\\Android\\Sdk
+```bash
+adb uninstall com.example.androidplayer
+adb install Ford-Player-*.apk
 ```
 
-## Підключення до пристрою
+> `local.properties` у CI видаляється, щоб Gradle використав `ANDROID_HOME`
+> раннера. Для підписаного релізу потрібен keystore у GitHub Secrets.
 
-1. Підключи телефон до тієї ж Wi-Fi-мережі, що й ESP32, або підключись до AP ESP32 (за замовчуванням `ESP32-MusicPlayer`).
-2. У додатку в розділі **Налаштування** можна змінити IP-адресу ESP32 (за замовчуванням `http://192.168.4.1`).
-3. Також можна використати **BLE** для підключення до пристрою.
 
-## Структура проєкту
+## Відомі обмеження
 
-```text
-AndroidPlayer/
-├── app/src/main/java/com/example/androidplayer/
-│   ├── data/        # Моделі, мережа, репозиторій, BLE
-│   ├── di/          # Hilt-модулі
-│   ├── ui/          # Compose-екрани, теми, навігація, ViewModel
-│   └── MainActivity.kt
-└── app/build.gradle
-```
-
-## Версія
-
-- **App versionName:** 1.0.0
-- **App versionCode:** 1
-
-## Ліцензія
-
-Проєкт призначений для особистого використання. Авторські права на оригінальний проєкт дивись у кореневому репозиторії **Ford-DensO-mp3**.
+- Wi-Fi-режим у застосунку відсутній (керування лише BLE).
+- Гучність і seek у external-режимі (BT зі Slave) не працюють — це керує телефон.
+- OTA йде lock-step кадрами: швидкість залежить від інтервалу з'єднання
+  (типово 20–50 КБ/с).
+- Потрібен дозвіл на сповіщення, інакше міні-плеєр не покажеться.

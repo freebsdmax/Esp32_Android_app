@@ -136,11 +136,27 @@ data class SystemInfo(
  * Модель настроек логов компонентов
  */
 data class ComponentLogSettings(
-    val player: Int = 1,           // 1 = включено, 0 = выключено
+    val player: Int = 1,
     val wifi_can_sniffer: Int = 1,
     val web_ota: Int = 1,
     val uart_ota: Int = 1,
-    val elm327: Int = 1
+    val elm327: Int = 1,
+    val pipeline: Int = 1,
+    val can: Int = 1,
+    val usb: Int = 1,
+    val ble: Int = 1,
+    val wifi: Int = 1,
+    val sleep: Int = 1,
+    val playlist: Int = 1,
+    val console: Int = 1,
+    val link: Int = 1,
+    val nvs: Int = 1,
+    // Module-level switches (what the UI actually edits)
+    val group_player: Int = 1,
+    val group_connect: Int = 1,
+    val group_ota: Int = 1,
+    val group_car: Int = 1,
+    val group_system: Int = 1
 )
 
 /**

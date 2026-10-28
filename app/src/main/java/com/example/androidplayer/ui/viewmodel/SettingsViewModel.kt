@@ -10,13 +10,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.example.androidplayer.data.model.SleepSettings
+import com.example.androidplayer.data.repository.Esp32PlayerRepository
+import com.example.androidplayer.ui.i18n.tr
+import timber.log.Timber
 
 /**
  * ViewModel для настроек приложения
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val repository: Esp32PlayerRepository
 ) : ViewModel() {
     
     private val prefs = context.getSharedPreferences("esp32_player_prefs", Context.MODE_PRIVATE)
@@ -26,6 +31,55 @@ class SettingsViewModel @Inject constructor(
     
     init {
         loadSettings()
+        loadSleepSettings()
+    }
+
+    /** Read the sleep/idle configuration from the device. */
+    fun loadSleepSettings() {
+        viewModelScope.launch {
+            repository.getSleepSettings().fold(
+                onSuccess = { sleep ->
+                    _uiState.value = _uiState.value.copy(
+                        sleepMode = sleep.sleepMode,
+                        sleepTimeoutSec = sleep.idleTimeoutSec.coerceAtLeast(10)
+                    )
+                },
+                onFailure = { Timber.w(it, "Failed to load sleep settings") }
+            )
+        }
+    }
+
+    fun setSleepMode(mode: Int) {
+        _uiState.value = _uiState.value.copy(sleepMode = mode)
+    }
+
+    fun setSleepTimeoutSeconds(seconds: Int) {
+        _uiState.value = _uiState.value.copy(sleepTimeoutSec = seconds.coerceIn(10, 28800))
+    }
+
+    fun saveSleepSettings() {
+        val state = _uiState.value
+        viewModelScope.launch {
+            repository.setSleepSettings(
+                SleepSettings(
+                    sleepMode = state.sleepMode,
+                    idleTimeoutSec = state.sleepTimeoutSec
+                )
+            ).fold(
+                onSuccess = {
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = true,
+                        saveMessage = tr("Налаштування сну збережено")
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = false,
+                        saveMessage = error.message ?: "Failed to save sleep settings"
+                    )
+                }
+            )
+        }
     }
     
     /**
@@ -60,7 +114,7 @@ class SettingsViewModel @Inject constructor(
         prefs.edit().putString("esp32_ip", ip).apply()
         _uiState.value = _uiState.value.copy(
             isSaved = true,
-            saveMessage = "IP адрес сохранен: $ip"
+            saveMessage = tr("IP-адресу збережено: %s").format(ip)
         )
     }
     
@@ -114,6 +168,8 @@ data class SettingsUiState(
     val autoReconnect: Boolean = true,
     val showNotifications: Boolean = true,
     val darkTheme: Boolean = false,
+    val sleepMode: Int = 0,
+    val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,
     val saveMessage: String? = null
 )

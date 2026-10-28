@@ -1,10 +1,13 @@
 package com.example.androidplayer.ui.screens
 
+import com.example.androidplayer.ui.i18n.tr
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,6 +69,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidplayer.ui.viewmodel.PlayerUiState
 import com.example.androidplayer.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
+import com.example.androidplayer.ui.notify.AppNotify
 
 /**
  * Главный экран управления плеером
@@ -78,6 +82,10 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+
+    LaunchedEffect(error) {
+        error?.let { AppNotify.error(it) }
+    }
 
     // Автообновление позиции через тихий опрос
     LaunchedEffect(uiState.currentTrack) {
@@ -93,20 +101,6 @@ fun PlayerScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "ESP32 Music Player",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Управление плеером и CAN-Sniffer",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-        }
 
         item {
             NowPlayingCard(
@@ -134,13 +128,7 @@ fun PlayerScreen(
         }
 
         if (uiState.playlist.isNotEmpty()) {
-            item {
-                PlaylistSection(
-                    uiState = uiState,
-                    onTrackSelect = { trackIndex -> viewModel.playTrack(trackIndex) }
-                )
-            }
-        }
+                    }
 
         error?.let { errorMessage ->
             item {
@@ -157,9 +145,6 @@ fun PlayerScreen(
     }
 }
 
-/**
- * Карточка "Сейчас играет"
- */
 @Composable
 private fun NowPlayingCard(
     uiState: PlayerUiState,
@@ -167,59 +152,63 @@ private fun NowPlayingCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.horizontalGradient(
+                    Brush.linearGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.tertiary
                         )
                     )
                 )
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.18f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
+                            tint = androidx.compose.ui.graphics.Color.White,
+                            modifier = Modifier.size(34.dp)
                         )
                     }
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = tr("ЗАРАЗ ГРАЄ"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.75f)
+                        )
                         if (isLoading) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
                                     strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = androidx.compose.ui.graphics.Color.White
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Загрузка...",
+                                    text = tr("Завантаження..."),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = androidx.compose.ui.graphics.Color.White
                                 )
                             }
                         } else {
@@ -227,19 +216,18 @@ private fun NowPlayingCard(
                                 text = if (uiState.playlist.isNotEmpty() && uiState.currentTrack < uiState.playlist.size) {
                                     uiState.playlist[uiState.currentTrack]
                                 } else {
-                                    "Трек ${uiState.currentTrack + 1}"
+                                    com.example.androidplayer.ui.i18n.Loc.trackName(uiState.currentTrack + 1)
                                 },
                                 style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = androidx.compose.ui.graphics.Color.White
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Трек ${uiState.currentTrack + 1} из ${if (uiState.playlistSize == 0) "—" else uiState.playlistSize}",
+                                text = com.example.androidplayer.ui.i18n.Loc.trackOf(uiState.currentTrack + 1, if (uiState.playlistSize == 0) 0 else uiState.playlistSize),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f)
                             )
                         }
                     }
@@ -250,11 +238,11 @@ private fun NowPlayingCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     StatusChip(
-                        text = "Режим: ${uiState.mode}",
+                        text = com.example.androidplayer.ui.i18n.Loc.modeText(uiState.mode),
                         icon = Icons.Default.SwapHoriz
                     )
                     StatusChip(
-                        text = if (uiState.snifferEnabled) "CAN-Sniffer: Вкл" else "CAN-Sniffer: Выкл",
+                        text = if (uiState.snifferEnabled) tr("CAN: увімк.") else tr("CAN: вимк."),
                         icon = Icons.Default.Radio,
                         highlighted = uiState.snifferEnabled
                     )
@@ -271,16 +259,10 @@ private fun StatusChip(
     highlighted: Boolean = false
 ) {
     val containerColor = if (highlighted) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+        androidx.compose.ui.graphics.Color.White.copy(alpha = 0.30f)
     } else {
-        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f)
+        androidx.compose.ui.graphics.Color.White.copy(alpha = 0.16f)
     }
-    val contentColor = if (highlighted) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    }
-
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
@@ -293,19 +275,16 @@ private fun StatusChip(
             imageVector = icon,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
-            tint = contentColor
+            tint = androidx.compose.ui.graphics.Color.White
         )
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
-            color = contentColor
+            color = androidx.compose.ui.graphics.Color.White
         )
     }
 }
 
-/**
- * Элементы управления плеером
- */
 @Composable
 private fun PlayerControls(
     uiState: PlayerUiState,
@@ -337,7 +316,7 @@ private fun PlayerControls(
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Управление",
+                    text = tr("Управление"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -358,7 +337,7 @@ private fun PlayerControls(
                 ) {
                     Icon(
                         Icons.Default.SkipPrevious,
-                        contentDescription = "Предыдущий трек"
+                        contentDescription = tr("Предыдущий трек")
                     )
                 }
 
@@ -377,7 +356,7 @@ private fun PlayerControls(
                     ) { isPaused ->
                         Icon(
                             imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                            contentDescription = if (isPaused) "Воспроизвести" else "Пауза",
+                            contentDescription = if (isPaused) tr("Відтворити") else tr("Пауза"),
                             modifier = Modifier.size(36.dp)
                         )
                     }
@@ -393,7 +372,7 @@ private fun PlayerControls(
                 ) {
                     Icon(
                         Icons.Default.SkipNext,
-                        contentDescription = "Следующий трек"
+                        contentDescription = tr("Следующий трек")
                     )
                 }
             }
@@ -409,7 +388,7 @@ private fun PlayerControls(
                 ) {
                     Icon(Icons.Default.SwapHoriz, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Переключить режим")
+                    Text("Mode")
                 }
 
                 Button(
@@ -431,7 +410,7 @@ private fun PlayerControls(
                 ) {
                     Icon(Icons.Default.Radio, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (uiState.snifferEnabled) "Снiffer Вкл" else "CAN-Sniffer")
+                    Text(if (uiState.snifferEnabled) tr("CAN-Sniffer: увімк.") else tr("CAN-Sniffer"))
                 }
             }
         }
@@ -468,7 +447,7 @@ private fun PlaybackPosition(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Прогресс воспроизведения",
+                        text = tr("Прогресс воспроизведения"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -518,144 +497,6 @@ private fun PlaybackPosition(
     }
 }
 
-/**
- * Секция плейлиста
- */
-@Composable
-private fun PlaylistSection(
-    uiState: PlayerUiState,
-    onTrackSelect: (Int) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Плейлист",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Text(
-                    text = "${uiState.playlist.size} треков",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            val listState = rememberLazyListState()
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.height(220.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                itemsIndexed(uiState.playlist) { index, track ->
-                    TrackItem(
-                        trackName = track,
-                        isPlaying = index == uiState.currentTrack,
-                        onClick = { onTrackSelect(index) }
-                    )
-
-                    if (index < uiState.playlist.size - 1) {
-                        Divider(
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Элемент трека в плейлисте
- */
-@Composable
-private fun TrackItem(
-    trackName: String,
-    isPlaying: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Default.VolumeUp else Icons.Default.MusicNote,
-                contentDescription = null,
-                tint = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-
-        Text(
-            text = trackName,
-            modifier = Modifier.weight(1f),
-            style = if (isPlaying) {
-                MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-            } else {
-                MaterialTheme.typography.bodyLarge
-            },
-            color = if (isPlaying) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        IconButton(onClick = onClick) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Воспроизвести трек",
-                tint = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-/**
- * Карточка ошибки
- */
 @Composable
 private fun ErrorCard(
     message: String,
@@ -687,7 +528,7 @@ private fun ErrorCard(
             IconButton(onClick = onDismiss) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Закрыть",
+                    contentDescription = tr("Закрыть"),
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
             }

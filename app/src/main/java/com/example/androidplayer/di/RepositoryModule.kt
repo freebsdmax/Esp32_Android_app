@@ -1,6 +1,7 @@
 package com.example.androidplayer.di
 
 import com.example.androidplayer.data.network.Esp32PlayerApi
+import com.example.androidplayer.data.ble.BlePlayerClient
 import com.example.androidplayer.data.repository.Esp32PlayerRepository
 import dagger.Module
 import dagger.Provides
@@ -15,8 +16,9 @@ object RepositoryModule {
     @Provides
     @Singleton
     fun provideEsp32PlayerRepository(
-        api: Esp32PlayerApi
+        api: Esp32PlayerApi,
+        bleClient: BlePlayerClient
     ): Esp32PlayerRepository {
-        return Esp32PlayerRepository(api)
+        return Esp32PlayerRepository(api, bleClient)
     }
 }

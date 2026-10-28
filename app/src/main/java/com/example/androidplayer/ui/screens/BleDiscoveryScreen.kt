@@ -1,5 +1,7 @@
 package com.example.androidplayer.ui.screens
 
+import com.example.androidplayer.ui.i18n.tr
+
 import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.content.pm.PackageManager
@@ -94,18 +96,7 @@ fun BleDiscoveryScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("🔍 Пошук пристроїв") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -143,11 +134,11 @@ fun BleDiscoveryScreen(
                     Column {
                         Text(
                             when {
-                                serviceError != null -> "Подключено, сервис не готов"
-                                notificationsReady -> "Подключено, плеер готов"
-                                serviceReady -> "Подключено, включаю уведомления…"
-                                isConnected -> "BLE подключено, ищу сервис плеера…"
-                                else -> "Не подключено"
+                                serviceError != null -> tr("Підключено, сервіс не готовий")
+                                notificationsReady -> tr("Підключено, плеєр готовий")
+                                serviceReady -> tr("Підключено, вмикаю сповіщення…")
+                                isConnected -> tr("BLE підключено, шукаю сервіс плеєра…")
+                                else -> tr("Не підключено")
                             },
                             fontWeight = FontWeight.Bold
                         )
@@ -168,7 +159,7 @@ fun BleDiscoveryScreen(
                 ) {
                     Icon(Icons.Default.LinkOff, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Отключить BLE и использовать Wi-Fi")
+                    Text(tr("Отключить BLE и использовать Wi-Fi"))
                 }
             }
 
@@ -190,13 +181,13 @@ fun BleDiscoveryScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text(if (isScanning) "🔍 Сканування..." else "🔍 Сканувати")
+                Text(if (isScanning) tr("🔍 Сканування...") else tr("🔍 Сканувати"))
             }
 
             // Список пристроїв
             if (discoveredDevices.isNotEmpty()) {
                 Text(
-                    "📱 Знайдено пристроїв: ${discoveredDevices.size}",
+                    tr("📱 Знайдено пристроїв: %d").format(discoveredDevices.size),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -232,7 +223,7 @@ fun BleDiscoveryScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "Пристрої не знайдені",
+                            tr("Пристрої не знайдені"),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -279,7 +270,7 @@ private fun DeviceCard(
             ) {
                 Icon(Icons.Default.Link, contentDescription = null)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Підключ")
+                Text(tr("Підключ"))
             }
         }
     }
