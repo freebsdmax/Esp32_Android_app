@@ -58,12 +58,20 @@ class BlePlayerClient(context: Context) {
     private val clientScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     /** When the current GATT link was established (elapsedRealtime, 0 = not connected). */
     @Volatile private var connectedAt = 0L
+    /** When the last connectGatt() call was made, used to de-duplicate attempts. */
+    @Volatile private var connectStartedAt = 0L
     /** How many times service discovery was retried on the current link. */
     @Volatile private var discoveryRetries = 0
     /** Consecutive failed RPC/status round trips; a sign of a half-open connection. */
     @Volatile private var consecutiveRpcFailures = 0
     /** True while a firmware transfer is running: no automatic link healing then. */
     @Volatile private var otaSessionActive = false
+    /** Rate limit for automatic healing (avoid reconnect loops). */
+    @Volatile private var healAttempts = 0
+    @Volatile private var lastHealAt = 0L
+    /** True while the app is recovering the link by itself (watchdog / post-OTA). */
+    val autoRecovering: Boolean get() = manualReconnectInProgress
+
     private val reconnectWatchdog = object : Runnable {
         override fun run() {
             val now = android.os.SystemClock.elapsedRealtime()
@@ -77,7 +85,7 @@ class BlePlayerClient(context: Context) {
                 }
                 // Link claims to be up, but the player service/notifications never became ready.
                 !_serviceReady.value || !_notificationsReady.value -> {
-                    if (connectedAt > 0 && now - connectedAt > 6000) {
+                    if (connectedAt > 0 && now - connectedAt > 12000) {
                         Timber.w(
                             "BLE watchdog: link is up but not ready " +
                                 "(service=${_serviceReady.value}, notif=${_notificationsReady.value})"
@@ -86,7 +94,7 @@ class BlePlayerClient(context: Context) {
                     }
                 }
                 // Connected and ready, but the board stopped answering: the link is stale.
-                consecutiveRpcFailures >= 5 && !otaSessionActive -> {
+                consecutiveRpcFailures >= 6 && !otaSessionActive -> {
                     Timber.w("BLE watchdog: ${consecutiveRpcFailures} failed requests in a row")
                     heal("device stopped answering")
                 }
@@ -101,7 +109,16 @@ class BlePlayerClient(context: Context) {
     /** Drops the link and reconnects from scratch (also used by the watchdog). */
     private fun heal(reason: String) {
         if (manualReconnectInProgress) return
-        Timber.w("BLE: healing connection ($reason)")
+        if (otaSessionActive) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastHealAt > 120000) healAttempts = 0
+        if (healAttempts >= 3) {
+            Timber.w("BLE: healing suppressed, already $healAttempts attempts")
+            return
+        }
+        healAttempts++
+        lastHealAt = now
+        Timber.w("BLE: healing connection ($reason, attempt $healAttempts)")
         connectedAt = 0
         consecutiveRpcFailures = 0
         clientScope.launch { forceReconnect() }
@@ -190,7 +207,14 @@ class BlePlayerClient(context: Context) {
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
-            
+            if (bluetoothGatt !== gatt) {
+                // Callback from an abandoned connection attempt. Letting it through
+                // makes two links fight each other and the app flaps connect/disconnect.
+                Timber.w("BLE: ignoring callback from a stale GATT (state=$newState status=$status)")
+                runCatching { gatt.close() }
+                return
+            }
+
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Timber.d("✅ BLE Connected")
@@ -418,6 +442,8 @@ class BlePlayerClient(context: Context) {
         val descriptor = pendingNotificationDescriptors.pollFirst()
         if (descriptor == null) {
             _notificationsReady.value = true
+            healAttempts = 0
+            consecutiveRpcFailures = 0
             Timber.d("✅ BLE notifications enabled")
             return
         }
@@ -834,6 +860,7 @@ class BlePlayerClient(context: Context) {
         }
 
         bluetoothGatt?.close()
+        connectStartedAt = android.os.SystemClock.elapsedRealtime()
         bluetoothGatt = device.connectGatt(context, false, gattCallback)
         reconnectHandler.removeCallbacks(reconnectWatchdog)
         reconnectHandler.postDelayed(reconnectWatchdog, 4000)
@@ -851,6 +878,14 @@ class BlePlayerClient(context: Context) {
         }
         val address = preferences.getString("device_address", null) ?: return false
         if (bluetoothGatt != null && _isConnected.value) {
+            return true
+        }
+        // A connection attempt is already in flight (the disconnect handler and the
+        // watchdog both fire): starting another one makes the stack flap.
+        if (bluetoothGatt != null && connectedAt == 0L &&
+            android.os.SystemClock.elapsedRealtime() - connectStartedAt < 8000
+        ) {
+            Timber.d("BLE: connect already in progress, skipping duplicate attempt")
             return true
         }
         if (bluetoothGatt != null) {
@@ -998,11 +1033,16 @@ class BlePlayerClient(context: Context) {
      * half-open GATT afterwards, so a fresh connection is forced either way.
      */
     suspend fun awaitRebootAndReconnect(bootWaitMs: Long = 6000): Boolean {
-        val deadline = android.os.SystemClock.elapsedRealtime() + 60000
-        while (_isConnected.value && android.os.SystemClock.elapsedRealtime() < deadline) {
-            delay(250)
+        manualReconnectInProgress = true
+        try {
+            val deadline = android.os.SystemClock.elapsedRealtime() + 60000
+            while (_isConnected.value && android.os.SystemClock.elapsedRealtime() < deadline) {
+                delay(250)
+            }
+            delay(bootWaitMs)
+        } finally {
+            manualReconnectInProgress = false
         }
-        delay(bootWaitMs)
         return forceReconnect(timeoutMs = 20000)
     }
 
@@ -1232,7 +1272,6 @@ class BlePlayerClient(context: Context) {
     suspend fun getStatus(): com.example.androidplayer.data.model.PlayerStatus {
         _statusData.value = null  // очистити старі дані
         if (!sendCommand("status")) {
-            consecutiveRpcFailures++
             throw IllegalStateException("BLE is not ready (player service is not available)")
         }
 
@@ -1245,9 +1284,9 @@ class BlePlayerClient(context: Context) {
             delay(100)
         }
 
-        // No answer: do not fake a "0 tracks, 0:00" state - the watchdog needs to
-        // know the link is dead so it can reconnect.
-        consecutiveRpcFailures++
+        // No answer: do not fake a "0 tracks, 0:00" state - the player screen shows an
+        // error instead. (Status polls do not count towards the reconnect heuristic,
+        // they are refreshed every second and may overlap.)
         throw IllegalStateException("BLE status timeout (device did not answer)")
     }
     

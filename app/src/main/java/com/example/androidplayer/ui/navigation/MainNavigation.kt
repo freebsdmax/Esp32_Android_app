@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,15 +74,21 @@ fun MainNavigation() {
     val bleConnected by ble.isConnected.collectAsState()
 
     // Mini player lives while the device is connected; connection changes are
-    // mirrored into the notification shade as well.
+    // mirrored into the notification shade as well - but only for real changes:
+    // short automatic reconnects (watchdog / after an OTA reboot) must not spam it.
     var firstConnectionState by remember { mutableStateOf(true) }
     LaunchedEffect(bleConnected) {
         if (bleConnected) PlaybackService.start(context) else PlaybackService.stop(context)
-        if (!firstConnectionState) {
-            if (bleConnected) AppNotify.info(Loc.notifConnected())
-            else AppNotify.error(Loc.notifDisconnected())
+        if (firstConnectionState) {
+            firstConnectionState = false
+            return@LaunchedEffect
         }
-        firstConnectionState = false
+        // Debounce: if the link flaps back within 3 s this effect is cancelled and
+        // nothing is posted at all.
+        delay(3000)
+        if (ble.autoRecovering) return@LaunchedEffect
+        if (bleConnected) AppNotify.info(Loc.notifConnected())
+        else AppNotify.error(Loc.notifDisconnected())
     }
 
     Scaffold(

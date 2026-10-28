@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -135,7 +136,7 @@ private fun BleConnectionCard(
                     ) {
                         Icon(Icons.Default.LinkOff, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(tr("Від'єднати"))
+                        Text(tr("Від'єднати"), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     OutlinedButton(
                         onClick = onReconnect,
@@ -144,7 +145,7 @@ private fun BleConnectionCard(
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(tr("Оновити"))
+                        Text(tr("Оновити"), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 } else {
                     Button(
@@ -154,18 +155,18 @@ private fun BleConnectionCard(
                     ) {
                         Icon(Icons.Default.Bluetooth, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(tr("Підключити"))
+                        Text(tr("Підключити"), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                Button(
-                    onClick = onOpenBle,
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(tr("Сканувати"))
-                }
+            }
+            Button(
+                onClick = onOpenBle,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(tr("Сканувати"))
             }
         }
     }
