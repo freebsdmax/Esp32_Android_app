@@ -66,7 +66,8 @@ fun SettingsScreen(
                 deviceLabel = ble.currentDeviceLabel(),
                 onOpenBle = onOpenBle,
                 onConnect = { ble.connectRememberedDevice() },
-                onDisconnect = { ble.disconnect() }
+                onDisconnect = { ble.disconnect() },
+                onReconnect = { ble.reconnect() }
             )
         }
         item {
@@ -97,7 +98,8 @@ private fun BleConnectionCard(
     deviceLabel: String,
     onOpenBle: () -> Unit,
     onConnect: () -> Unit,
-    onDisconnect: () -> Unit
+    onDisconnect: () -> Unit,
+    onReconnect: () -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -134,6 +136,15 @@ private fun BleConnectionCard(
                         Icon(Icons.Default.LinkOff, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(tr("Від'єднати"))
+                    }
+                    OutlinedButton(
+                        onClick = onReconnect,
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("Оновити"))
                     }
                 } else {
                     Button(

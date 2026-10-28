@@ -93,6 +93,7 @@ object Loc {
         "Выбрать и загрузить прошивку Master" to "Select and upload Master firmware",
         "Выбрать и загрузить прошивку Slave" to "Select and upload Slave firmware",
         "Від'єднати" to "Disconnect",
+        "Оновити" to "Refresh",
         "Детальные логи (эмодзи и баннеры)" to "Verbose logs (emoji and banners)",
         "ЗАРАЗ ГРАЄ" to "NOW PLAYING",
         "Завантаження..." to "Loading...",

@@ -298,6 +298,7 @@ class Esp32PlayerRepository @Inject constructor(
         onProgress: (OtaTransferProgress) -> Unit
     ): Result<Unit> = safeApiCall {
         if (!otaMutex.tryLock()) throw IllegalStateException("An update is already in progress")
+        bleClient.setOtaSessionActive(true)
         try {
             val mtu = bleClient.ensureMtu()
             if (mtu < 100) throw IllegalStateException("BLE MTU too small ($mtu). Reconnect and retry.")
@@ -427,6 +428,7 @@ class Esp32PlayerRepository @Inject constructor(
                 throw e
             }
         } finally {
+            bleClient.setOtaSessionActive(false)
             otaMutex.unlock()
         }
     }

@@ -207,6 +207,14 @@ class UpdateViewModel @Inject constructor(
                             fwUpdate = false,
                             fwCurrent = _uiState.value.fwLatest
                         )
+                        // The master reboots right after applying the image. Android often
+                        // keeps a half-open GATT, so wait for the reboot and force a fresh
+                        // connection - otherwise the app shows "connected" with no data.
+                        viewModelScope.launch {
+                            val reconnected = bleClient.awaitRebootAndReconnect()
+                            Timber.d("BLE after firmware reboot: reconnected=$reconnected")
+                            if (reconnected) checkForUpdates()
+                        }
                     },
                     onFailure = { error ->
                         _uiState.value = _uiState.value.copy(
