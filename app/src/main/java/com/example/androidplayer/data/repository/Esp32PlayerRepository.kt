@@ -452,6 +452,10 @@ class Esp32PlayerRepository @Inject constructor(
     // МОНИТОРИНГ
     // ========================================================================
     
+    suspend fun getMedia(): Result<MediaInfo> = safeApiCall {
+        bleClient.getMedia()
+    }
+
     suspend fun getSystemLogs(): Result<String> = safeApiCall {
         if (useBleTransport && bleClient != null) bleClient.getSystemLogs() else api.getSystemLogs()
     }

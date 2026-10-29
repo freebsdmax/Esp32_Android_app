@@ -81,6 +81,7 @@ class PlayerViewModel @Inject constructor(
     fun loadAfterBleReady() {
         loadPlayerStatus()
         loadPlaylist()
+        refreshMedia()
     }
     
     /**
@@ -300,6 +301,28 @@ class PlayerViewModel @Inject constructor(
     }
 
     /**
+     * Metadata of the track playing on the phone (external/BT mode).
+     * The master polls the slave over UART, so this is a cheap cached read.
+     */
+    fun refreshMedia() {
+        viewModelScope.launch {
+            repository.getMedia().onSuccess { media ->
+                if (media.valid) {
+                    _uiState.value = _uiState.value.copy(
+                        mediaTitle = media.title,
+                        mediaArtist = media.artist,
+                        positionMs = media.posMs,
+                        durationMs = if (media.durMs > 0) media.durMs else _uiState.value.durationMs,
+                        isPaused = !media.playing
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(mediaTitle = "", mediaArtist = "")
+                }
+            }
+        }
+    }
+
+    /**
      * Quietly poll player status without toggling loading/error UI (used for live position updates)
      */
     fun pollPlayerStatus() {
@@ -320,6 +343,7 @@ class PlayerViewModel @Inject constructor(
                             mode = status.mode,
                             snifferEnabled = status.snifferEnabled
                         )
+                        if (status.mode == "external") refreshMedia()
                     },
                     onFailure = { e ->
                         Timber.w(e, "Quiet poll failed")
@@ -343,5 +367,8 @@ data class PlayerUiState(
     val playlistSize: Int = 0,
     val playlist: List<String> = emptyList(),
     val mode: String = "USB", // "USB" или "external"
-    val snifferEnabled: Boolean = false
+    val snifferEnabled: Boolean = false,
+    /** Зараз грає на телефоні (Bluetooth): назва / виконавець */
+    val mediaTitle: String = "",
+    val mediaArtist: String = ""
 )

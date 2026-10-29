@@ -244,3 +244,13 @@ data class AppSettings(
     val defaultVolume: Int = 50,
     val notificationPriority: String = "normal" // "low", "normal", "high"
 )
+
+/** Що зараз грає на телефоні (Bluetooth / AVRCP через Slave). */
+data class MediaInfo(
+    val valid: Boolean = false,
+    val playing: Boolean = false,
+    val posMs: Int = 0,
+    val durMs: Int = 0,
+    val title: String = "",
+    val artist: String = ""
+)

@@ -752,6 +752,18 @@ class BlePlayerClient(context: Context) {
         )
     }
 
+    suspend fun getMedia(): com.example.androidplayer.data.model.MediaInfo {
+        val json = JSONObject(rpc("media.get"))
+        return com.example.androidplayer.data.model.MediaInfo(
+            valid = json.optBoolean("valid"),
+            playing = json.optBoolean("playing"),
+            posMs = json.optInt("pos_ms"),
+            durMs = json.optInt("dur_ms"),
+            title = json.optString("title"),
+            artist = json.optString("artist")
+        )
+    }
+
     suspend fun getSystemLogs(): String = rpc("logs.get")
 
     suspend fun getSystemInfo(): SystemInfo {

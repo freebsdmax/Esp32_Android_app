@@ -214,11 +214,13 @@ private fun NowPlayingCard(
                                 )
                             }
                         } else {
+                            val external = uiState.mode == "external"
                             Text(
-                                text = if (uiState.playlist.isNotEmpty() && uiState.currentTrack < uiState.playlist.size) {
-                                    uiState.playlist[uiState.currentTrack]
-                                } else {
-                                    com.example.androidplayer.ui.i18n.Loc.trackName(uiState.currentTrack + 1)
+                                text = when {
+                                    external && uiState.mediaTitle.isNotBlank() -> uiState.mediaTitle
+                                    uiState.playlist.isNotEmpty() && uiState.currentTrack < uiState.playlist.size ->
+                                        uiState.playlist[uiState.currentTrack]
+                                    else -> com.example.androidplayer.ui.i18n.Loc.trackName(uiState.currentTrack + 1)
                                 },
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
@@ -227,8 +229,17 @@ private fun NowPlayingCard(
                                 color = androidx.compose.ui.graphics.Color.White
                             )
                             Text(
-                                text = com.example.androidplayer.ui.i18n.Loc.trackOf(uiState.currentTrack + 1, if (uiState.playlistSize == 0) 0 else uiState.playlistSize),
+                                text = when {
+                                    external && uiState.mediaArtist.isNotBlank() -> uiState.mediaArtist
+                                    external -> tr("Bluetooth")
+                                    else -> com.example.androidplayer.ui.i18n.Loc.trackOf(
+                                        uiState.currentTrack + 1,
+                                        if (uiState.playlistSize == 0) 0 else uiState.playlistSize
+                                    )
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f)
                             )
                         }
