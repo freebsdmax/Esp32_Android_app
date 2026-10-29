@@ -102,15 +102,19 @@ class PlayerViewModel @Inject constructor(
             
             repository.getPlayerStatus().fold(
                 onSuccess = { status ->
+                    // In external/BT mode the local player is idle: its position and
+                    // pause flag are meaningless and make the progress jump to 0:00.
+                    val ext = status.mode == "external"
                     _uiState.value = _uiState.value.copy(
                         currentTrack = status.currentTrack,
-                        positionMs = status.positionMs,
-                        durationMs = status.durationMs,
-                        isPaused = status.isPaused,
+                        positionMs = if (ext) _uiState.value.positionMs else status.positionMs,
+                        durationMs = if (ext) _uiState.value.durationMs else status.durationMs,
+                        isPaused = if (ext) _uiState.value.isPaused else status.isPaused,
                         playlistSize = status.playlistSize,
                         mode = status.mode,
                         snifferEnabled = status.snifferEnabled
                     )
+                    if (ext) refreshMedia()
                     Timber.d("Player status loaded: $status")
                 },
                 onFailure = { error ->
@@ -334,16 +338,17 @@ class PlayerViewModel @Inject constructor(
                 repository.getPlayerStatus().fold(
                     onSuccess = { status ->
                         // Update UI state but don't set global loading or error
+                        val ext = status.mode == "external"
                         _uiState.value = _uiState.value.copy(
                             currentTrack = status.currentTrack,
-                            positionMs = status.positionMs,
-                            durationMs = status.durationMs,
-                            isPaused = status.isPaused,
+                            positionMs = if (ext) _uiState.value.positionMs else status.positionMs,
+                            durationMs = if (ext) _uiState.value.durationMs else status.durationMs,
+                            isPaused = if (ext) _uiState.value.isPaused else status.isPaused,
                             playlistSize = status.playlistSize,
                             mode = status.mode,
                             snifferEnabled = status.snifferEnabled
                         )
-                        if (status.mode == "external") refreshMedia()
+                        if (ext) refreshMedia()
                     },
                     onFailure = { e ->
                         Timber.w(e, "Quiet poll failed")
