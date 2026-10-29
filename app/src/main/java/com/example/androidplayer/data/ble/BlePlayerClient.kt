@@ -455,7 +455,11 @@ class BlePlayerClient(context: Context) {
         }
     }
 
-    private suspend fun rpc(operation: String, payload: String? = null): String = rpcMutex.withLock {
+    private suspend fun rpc(
+        operation: String,
+        payload: String? = null,
+        timeoutMs: Long = 5000
+    ): String = rpcMutex.withLock {
         val response = CompletableDeferred<String>()
         pendingRpcResponse = response
         val request = if (payload == null) operation else "$operation:$payload"
@@ -465,7 +469,7 @@ class BlePlayerClient(context: Context) {
         }
 
         val text = try {
-            withTimeout(5000) { response.await() }
+            withTimeout(timeoutMs) { response.await() }
         } catch (e: TimeoutCancellationException) {
             Timber.w("BLE RPC timeout: $operation")
             consecutiveRpcFailures++
@@ -683,8 +687,19 @@ class BlePlayerClient(context: Context) {
         val error: String
     )
 
-    suspend fun fileOtaBegin(totalSize: Int, target: String): Boolean {
-        val payload = JSONObject().put("size", totalSize).put("target", target).toString()
+    /**
+     * Starts a file transfer.
+     * @param name when set, the image is stored in the device's internal FAT
+     *             (/storage/<name>) instead of being applied immediately.
+     */
+    suspend fun fileOtaBegin(totalSize: Int, target: String, name: String? = null): Boolean {
+        val json = JSONObject().put("size", totalSize)
+        if (name != null) {
+            json.put("target", "storage").put("name", name)
+        } else {
+            json.put("target", target)
+        }
+        val payload = json.toString()
         val result = JSONObject(rpc("file.begin", payload))
         if (!result.optBoolean("success")) {
             throw IllegalStateException(result.optString("error", "File OTA begin rejected"))
@@ -728,8 +743,18 @@ class BlePlayerClient(context: Context) {
         return -1
     }
 
+    /** Flashes a .bin already stored on the device and deletes it afterwards. */
+    suspend fun fileOtaFlash(name: String, target: String): Boolean {
+        val payload = JSONObject().put("name", name).put("target", target).toString()
+        val result = JSONObject(rpc("file.flash", payload, timeoutMs = 30000))
+        if (!result.optBoolean("success")) {
+            throw IllegalStateException(result.optString("error", "Flashing the stored image failed"))
+        }
+        return true
+    }
+
     suspend fun fileOtaFinish(): Boolean {
-        val result = JSONObject(rpc("file.finish"))
+        val result = JSONObject(rpc("file.finish", timeoutMs = 30000))
         if (!result.optBoolean("success")) {
             throw IllegalStateException(result.optString("error", "File OTA finish rejected"))
         }

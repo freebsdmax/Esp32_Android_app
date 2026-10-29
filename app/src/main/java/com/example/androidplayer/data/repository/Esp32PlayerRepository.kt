@@ -292,9 +292,18 @@ class Esp32PlayerRepository @Inject constructor(
     }
 
 
+    /**
+     * Uploads a firmware image and flashes it.
+     *
+     * When [storeName] is set the image is first written to the device's
+     * internal /storage/<storeName> and only then flashed; the file is deleted
+     * by the device after a successful update. This keeps the download on the
+     * board until the flash really happened.
+     */
     suspend fun bleFileOtaUpdate(
         firmware: ByteArray,
         target: String,
+        storeName: String? = null,
         onProgress: (OtaTransferProgress) -> Unit
     ): Result<Unit> = safeApiCall {
         if (!otaMutex.tryLock()) throw IllegalStateException("An update is already in progress")
@@ -302,7 +311,7 @@ class Esp32PlayerRepository @Inject constructor(
         try {
             val mtu = bleClient.ensureMtu()
             if (mtu < 100) throw IllegalStateException("BLE MTU too small ($mtu). Reconnect and retry.")
-            bleClient.fileOtaBegin(firmware.size, target)
+            bleClient.fileOtaBegin(firmware.size, target, storeName)
             val total = firmware.size.toLong()
             val uploadMeter = RateTracker()
             var offset = 0
@@ -399,7 +408,17 @@ class Esp32PlayerRepository @Inject constructor(
 
                 emit("apply", total, total, 90, uploadMeter)
                 bleClient.fileOtaFinish()
-                if (target == "master") {
+
+                if (storeName != null) {
+                    // The image is on the device now: flash it from /storage and
+                    // let the device delete the file after success.
+                    emit("apply", 0, total, 91, uploadMeter)
+                    bleClient.fileOtaFlash(storeName, target)
+                    if (target == "master") {
+                        emit("apply", total, total, 100, uploadMeter)
+                        return@safeApiCall
+                    }
+                } else if (target == "master") {
                     emit("apply", total, total, 100, uploadMeter)
                     return@safeApiCall
                 }

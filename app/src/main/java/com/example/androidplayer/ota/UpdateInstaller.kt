@@ -86,7 +86,8 @@ class UpdateInstaller @Inject constructor(
                 val uploadShare = if (target == "slave") 67 else 50
                 val uploadBase = if (target == "slave") 33 else 50
 
-                repository.bleFileOtaUpdate(bytes, target) { transfer ->
+                val storeName = if (target == "slave") "slave.bin" else "master.bin"
+                repository.bleFileOtaUpdate(bytes, target, storeName) { transfer ->
                     val overall = uploadBase + (transfer.percent * uploadShare / 100)
                     _progress.value = _progress.value.copy(
                         percent = overall,
