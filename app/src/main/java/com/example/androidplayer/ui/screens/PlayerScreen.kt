@@ -105,7 +105,9 @@ fun PlayerScreen(
         item {
             NowPlayingCard(
                 uiState = uiState,
-                isLoading = isLoading
+                isLoading = isLoading,
+                onSwitchMode = { viewModel.switchMode() },
+                onToggleSniffer = { viewModel.toggleSniffer() }
             )
         }
 
@@ -114,9 +116,7 @@ fun PlayerScreen(
                 uiState = uiState,
                 onPlayPause = { viewModel.togglePlayback() },
                 onNext = { viewModel.nextTrack() },
-                onPrevious = { viewModel.previousTrack() },
-                onSwitchMode = { viewModel.switchMode() },
-                onToggleSniffer = { viewModel.toggleSniffer() }
+                onPrevious = { viewModel.previousTrack() }
             )
         }
 
@@ -148,7 +148,9 @@ fun PlayerScreen(
 @Composable
 private fun NowPlayingCard(
     uiState: PlayerUiState,
-    isLoading: Boolean
+    isLoading: Boolean,
+    onSwitchMode: () -> Unit,
+    onToggleSniffer: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -239,12 +241,14 @@ private fun NowPlayingCard(
                 ) {
                     StatusChip(
                         text = com.example.androidplayer.ui.i18n.Loc.modeText(uiState.mode),
-                        icon = Icons.Default.SwapHoriz
+                        icon = Icons.Default.SwapHoriz,
+                        onClick = onSwitchMode
                     )
                     StatusChip(
                         text = if (uiState.snifferEnabled) tr("CAN: увімк.") else tr("CAN: вимк."),
                         icon = Icons.Default.Radio,
-                        highlighted = uiState.snifferEnabled
+                        highlighted = uiState.snifferEnabled,
+                        onClick = onToggleSniffer
                     )
                 }
             }
@@ -256,7 +260,8 @@ private fun NowPlayingCard(
 private fun StatusChip(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    highlighted: Boolean = false
+    highlighted: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
     val containerColor = if (highlighted) {
         androidx.compose.ui.graphics.Color.White.copy(alpha = 0.30f)
@@ -267,6 +272,9 @@ private fun StatusChip(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
             .background(containerColor)
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+            )
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -290,9 +298,7 @@ private fun PlayerControls(
     uiState: PlayerUiState,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
-    onPrevious: () -> Unit,
-    onSwitchMode: () -> Unit,
-    onToggleSniffer: () -> Unit
+    onPrevious: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -377,42 +383,6 @@ private fun PlayerControls(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onSwitchMode,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(Icons.Default.SwapHoriz, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Mode")
-                }
-
-                Button(
-                    onClick = onToggleSniffer,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (uiState.snifferEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        contentColor = if (uiState.snifferEnabled) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
-                    )
-                ) {
-                    Icon(Icons.Default.Radio, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (uiState.snifferEnabled) tr("CAN-Sniffer: увімк.") else tr("CAN-Sniffer"))
-                }
-            }
         }
     }
 }

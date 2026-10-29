@@ -11,6 +11,9 @@ import com.example.androidplayer.data.github.GitHubReleaseClient
 import com.example.androidplayer.data.model.ReleaseInfo
 import com.example.androidplayer.data.model.VersionCompare
 import com.example.androidplayer.data.repository.Esp32PlayerRepository
+import com.example.androidplayer.ota.OtaNotifications
+import com.example.androidplayer.ota.OtaUploadService
+import com.example.androidplayer.ota.UpdateInstaller
 import com.example.androidplayer.ui.i18n.Loc
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,6 +30,7 @@ class UpdateViewModel @Inject constructor(
     private val github: GitHubReleaseClient,
     private val repository: Esp32PlayerRepository,
     private val bleClient: com.example.androidplayer.data.ble.BlePlayerClient,
+    private val installer: UpdateInstaller,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -56,6 +60,7 @@ class UpdateViewModel @Inject constructor(
     private var appRelease: ReleaseInfo? = null
     private var fwRelease: ReleaseInfo? = null
     private var slaveRelease: ReleaseInfo? = null
+    private var lastFinishedCount = 0
 
     init {
         viewModelScope.launch {
@@ -63,11 +68,27 @@ class UpdateViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(connected = connected)
             }
         }
+        // Flashing runs in the singleton installer (survives leaving the screen);
+        // here we only mirror its state into the UI.
+        viewModelScope.launch {
+            installer.progress.collect { p ->
+                _uiState.value = _uiState.value.copy(
+                    busy = p.running,
+                    progress = p.percent,
+                    status = p.status,
+                    error = p.error
+                )
+                if (p.finishedCount != lastFinishedCount) {
+                    lastFinishedCount = p.finishedCount
+                    if (p.lastSuccess) checkForUpdates()
+                }
+            }
+        }
         checkForUpdates()
     }
 
     fun checkForUpdates(force: Boolean = false) {
-        if (_uiState.value.busy) return
+        if (_uiState.value.checking || _uiState.value.busy) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(checking = true, error = null, status = null)
 
@@ -147,11 +168,23 @@ class UpdateViewModel @Inject constructor(
                 busy = true, progress = 0, error = null,
                 status = Loc.updateDownloading(asset.name)
             )
+            OtaUploadService.start(context)
+            OtaNotifications.updateProgress(context, 0, Loc.otaProgressText(asset.name, 0, 0, -1))
             try {
                 val file = File(context.cacheDir, "updates/${asset.name}")
+                var lastPercent = -1
                 github.download(asset.url, file) { percent ->
                     _uiState.value = _uiState.value.copy(progress = percent)
+                    if (percent != lastPercent) {
+                        lastPercent = percent
+                        OtaNotifications.updateProgress(
+                            context,
+                            percent,
+                            Loc.otaProgressText(asset.name, percent, 0, -1)
+                        )
+                    }
                 }
+                OtaUploadService.stop(context)
                 _uiState.value = _uiState.value.copy(
                     busy = false,
                     progress = 100,
@@ -160,6 +193,7 @@ class UpdateViewModel @Inject constructor(
                 installApk(file)
             } catch (e: Exception) {
                 Timber.e(e, "APK download failed")
+                OtaUploadService.stop(context)
                 _uiState.value = _uiState.value.copy(
                     busy = false,
                     error = Loc.updateErrorDownload(e.message ?: "unknown")
@@ -182,7 +216,7 @@ class UpdateViewModel @Inject constructor(
         context.startActivity(intent)
     }
 
-    /** Завантажити образ прошивки і прошити Master по BLE. */
+    /** Завантажити образ прошивки і прошити Master по BLE (працює у фоні). */
     fun downloadAndFlashFirmware() {
         val release = fwRelease ?: return
         val asset = release.asset(listOf(".bin"), exclude = listOf("-full", "bootloader", "partition", "ota_data"))
@@ -191,64 +225,10 @@ class UpdateViewModel @Inject constructor(
                 return
             }
         if (_uiState.value.busy) return
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                busy = true, progress = 0, error = null,
-                status = Loc.updateDownloading(asset.name)
-            )
-            try {
-                val file = File(context.cacheDir, "updates/${asset.name}")
-                github.download(asset.url, file) { percent ->
-                    _uiState.value = _uiState.value.copy(progress = percent / 2)
-                }
-
-                _uiState.value = _uiState.value.copy(status = Loc.updateFlashing())
-                val bytes = file.readBytes()
-
-                repository.bleFileOtaUpdate(bytes, "master") { transfer ->
-                    // передача 0..90 -> 50..100 у загальному прогресі
-                    val overall = 50 + (transfer.percent * 50 / 100)
-                    _uiState.value = _uiState.value.copy(
-                        progress = overall,
-                        status = Loc.updateFlashingPercent(transfer.percent)
-                    )
-                }.fold(
-                    onSuccess = {
-                        _uiState.value = _uiState.value.copy(
-                            busy = false,
-                            progress = 100,
-                            status = Loc.updateFlashed(),
-                            fwUpdate = false,
-                            fwCurrent = _uiState.value.fwLatest
-                        )
-                        // The master reboots right after applying the image. Android often
-                        // keeps a half-open GATT, so wait for the reboot and force a fresh
-                        // connection - otherwise the app shows "connected" with no data.
-                        viewModelScope.launch {
-                            val reconnected = bleClient.awaitRebootAndReconnect()
-                            Timber.d("BLE after firmware reboot: reconnected=$reconnected")
-                            if (reconnected) checkForUpdates()
-                        }
-                    },
-                    onFailure = { error ->
-                        _uiState.value = _uiState.value.copy(
-                            busy = false,
-                            error = Loc.updateErrorFlash(error.message ?: "unknown")
-                        )
-                    }
-                )
-            } catch (e: Exception) {
-                Timber.e(e, "Firmware download failed")
-                _uiState.value = _uiState.value.copy(
-                    busy = false,
-                    error = Loc.updateErrorDownload(e.message ?: "unknown")
-                )
-            }
-        }
+        installer.flash(asset, "master")
     }
 
-    /** Завантажити образ Slave і прошити його через Master (BLE -> UART). */
+    /** Завантажити образ Slave і прошити його через Master (BLE -> UART, працює у фоні). */
     fun downloadAndFlashSlave() {
         val release = slaveRelease ?: return
         val asset = release.asset(listOf(".bin"), exclude = listOf("-full", "bootloader", "partition", "ota_data"))
@@ -257,56 +237,12 @@ class UpdateViewModel @Inject constructor(
                 return
             }
         if (_uiState.value.busy) return
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                busy = true, progress = 0, error = null,
-                status = Loc.updateDownloading(asset.name)
-            )
-            try {
-                val file = File(context.cacheDir, "updates/${asset.name}")
-                github.download(asset.url, file) { percent ->
-                    _uiState.value = _uiState.value.copy(progress = percent / 3)
-                }
-
-                _uiState.value = _uiState.value.copy(status = Loc.updateFlashing())
-                val bytes = file.readBytes()
-
-                repository.bleFileOtaUpdate(bytes, "slave") { transfer ->
-                    val overall = 33 + (transfer.percent * 67 / 100)
-                    _uiState.value = _uiState.value.copy(
-                        progress = overall,
-                        status = Loc.updateFlashingPercent(transfer.percent)
-                    )
-                }.fold(
-                    onSuccess = {
-                        _uiState.value = _uiState.value.copy(
-                            busy = false,
-                            progress = 100,
-                            status = Loc.updateFlashedSlave(),
-                            slaveUpdate = false,
-                            slaveCurrent = _uiState.value.slaveLatest
-                        )
-                    },
-                    onFailure = { error ->
-                        _uiState.value = _uiState.value.copy(
-                            busy = false,
-                            error = Loc.updateErrorFlash(error.message ?: "unknown")
-                        )
-                    }
-                )
-            } catch (e: Exception) {
-                Timber.e(e, "Slave firmware download failed")
-                _uiState.value = _uiState.value.copy(
-                    busy = false,
-                    error = Loc.updateErrorDownload(e.message ?: "unknown")
-                )
-            }
-        }
+        installer.flash(asset, "slave")
     }
 
     fun clearMessages() {
         _uiState.value = _uiState.value.copy(error = null, status = null)
+        installer.clearMessages()
     }
 
     companion object {
