@@ -60,6 +60,12 @@ class SystemMonitorViewModel @Inject constructor(
      * Загрузка системных логов
      */
     fun loadSystemLogs() {
+        // No BLE link yet (e.g. the screen was opened during a reconnect):
+        // just stay silent instead of showing a pointless error in the tray.
+        if (!bleClient.serviceReady.value) {
+            Timber.d("Logs: BLE is not ready, skipping load")
+            return
+        }
         viewModelScope.launch {
             _isLoading.value = true
             try {
@@ -73,7 +79,11 @@ class SystemMonitorViewModel @Inject constructor(
                     },
                     onFailure = { error ->
                         Timber.e(error, "Failed to load system logs")
-                        _error.value = tr("Помилка завантаження логів: %s").format(error.message ?: error.toString())
+                        // A dropped link is not an error worth a notification.
+                        if (bleClient.serviceReady.value) {
+                            _error.value = tr("Помилка завантаження логів: %s")
+                                .format(error.message ?: error.toString())
+                        }
                     }
                 )
             } finally {
@@ -138,6 +148,7 @@ class SystemMonitorViewModel @Inject constructor(
         viewModelScope.launch {
             while (true) {
                 kotlinx.coroutines.delay(3000)
+                if (!bleClient.serviceReady.value) continue
                 repository.getSystemLogs().fold(
                     onSuccess = { logs ->
                         val currentState = _uiState.value
