@@ -8,6 +8,18 @@
   <i>UK / EN інтерфейс, міні-плеєр у шторці, OTA Master і Slave</i>
 </p>
 
+
+## Довідка та пов'язані репозиторії
+
+| Компонент | Репозиторій |
+|---|---|
+| Master (ESP32-S3) | https://github.com/freebsdmax/Ford-DensO-mp3-master |
+| Slave (ESP32 Bluetooth) | https://github.com/freebsdmax/Ford-DensO-bluetooth-slave |
+| Android-застосунок | https://github.com/freebsdmax/Esp32_Android_app |
+
+- Повна довідка по системі: [HELP.md](https://github.com/freebsdmax/Ford-DensO-mp3-master/blob/debug/HELP.md)
+- Довідка цього компонента: [HELP.md](HELP.md)
+
 ---
 
 ## Вимоги
