@@ -83,12 +83,10 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 Встановлення:
 
 ```powershell
-adb uninstall com.example.androidplayer
 adb install app\build\outputs\apk\debug\app-debug.apk
 ```
 
-> `versionCode` завжди `1`, тому при оновленні краще робити `uninstall` —
-> інакше Android може залишити стару версію.
+> `versionCode` і `versionName` беруться з git-тега (у CI передаються як `-PappVersionCode` / `-PappVersionName`), тому APK ставиться поверх попередньої версії без видалення застосунку.
 
 ## Архітектура
 
@@ -150,7 +148,6 @@ git push origin v1.1.0
 Артефакт: `Ford-Player-vX.Y.Z.apk` (debug-підпис).
 
 ```bash
-adb uninstall com.example.androidplayer
 adb install Ford-Player-*.apk
 ```
 
