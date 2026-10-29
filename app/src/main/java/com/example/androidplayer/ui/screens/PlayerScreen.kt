@@ -124,8 +124,7 @@ fun PlayerScreen(
         item {
             PlaybackPosition(
                 uiState = uiState,
-                onPositionChange = { position -> viewModel.setPosition(position) },
-                onSeekBy = { delta -> viewModel.seekBy(delta) }
+                onPositionChange = { position -> viewModel.setPosition(position) }
             )
         }
 
@@ -406,8 +405,7 @@ private fun PlayerControls(
 @Composable
 private fun PlaybackPosition(
     uiState: PlayerUiState,
-    onPositionChange: (Int) -> Unit,
-    onSeekBy: (Int) -> Unit
+    onPositionChange: (Int) -> Unit
 ) {
     if (uiState.durationMs > 0) {
         Card(
@@ -438,89 +436,52 @@ private fun PlaybackPosition(
                 }
 
                 val external = uiState.mode == "external"
+                var isSeeking by remember { mutableStateOf(false) }
+                var sliderPosition by remember { mutableStateOf(0f) }
 
-                if (external) {
-                    /* Bluetooth: AVRCP cannot set an absolute position, so a slider
-                       would always lie. Two step buttons send a relative seek. */
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { onSeekBy(-10000) },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Text(Loc.seekBack10())
-                        }
-                        OutlinedButton(
-                            onClick = { onSeekBy(10000) },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Text(Loc.seekFwd10())
-                        }
+                LaunchedEffect(uiState.positionMs, uiState.durationMs, external) {
+                    if (!isSeeking && uiState.durationMs > 0) {
+                        sliderPosition = uiState.positionMs.toFloat() / uiState.durationMs
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = formatTime(uiState.positionMs),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formatTime(uiState.durationMs),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        text = Loc.seekHint(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    var isSeeking by remember { mutableStateOf(false) }
-                    var sliderPosition by remember { mutableStateOf(0f) }
+                }
 
-                    LaunchedEffect(uiState.positionMs, uiState.durationMs) {
-                        if (!isSeeking && uiState.durationMs > 0) {
-                            sliderPosition = uiState.positionMs.toFloat() / uiState.durationMs
-                        }
-                    }
-
-                    Slider(
-                        value = sliderPosition.coerceIn(0f..1f),
-                        onValueChange = { newValue ->
+                /* Bluetooth (external): AVRCP cannot set a position, so the slider is
+                   visible but disabled - it must not seek anywhere. USB playback is
+                   untouched and seeks exactly as before. */
+                Slider(
+                    value = sliderPosition.coerceIn(0f..1f),
+                    onValueChange = { newValue ->
+                        if (!external) {
                             sliderPosition = newValue
                             isSeeking = true
-                        },
-                        onValueChangeFinished = {
+                        }
+                    },
+                    onValueChangeFinished = {
+                        if (!external) {
                             val newMs = (sliderPosition * uiState.durationMs).toInt()
                             onPositionChange(newMs)
-                            isSeeking = false
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        }
+                        isSeeking = false
+                    },
+                    enabled = !external,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val displayMs = if (isSeeking) (sliderPosition * uiState.durationMs).toInt() else uiState.positionMs
-                        Text(
-                            text = formatTime(displayMs),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formatTime(uiState.durationMs),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    val displayMs = if (isSeeking) (sliderPosition * uiState.durationMs).toInt() else uiState.positionMs
+                    Text(
+                        text = formatTime(displayMs),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formatTime(uiState.durationMs),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
