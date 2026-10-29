@@ -12,7 +12,7 @@ BLE-only пульт для аудіо-комплексу: плеєр, плейл
 | **App** (цей) | https://github.com/freebsdmax/Esp32_Android_app | Android-пульт до Master |
 
 Повна довідка по системі: **`HELP.md` у репозиторії Master**
-(https://github.com/freebsdmax/Ford-DensO-mp3-master/blob/debug/HELP.md).
+(https://github.com/freebsdmax/Ford-DensO-mp3-master/blob/main/HELP.md).
 
 ## Екрани
 
