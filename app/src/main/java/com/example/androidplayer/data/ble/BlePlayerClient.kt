@@ -743,6 +743,12 @@ class BlePlayerClient(context: Context) {
         return -1
     }
 
+    /** Size of the image already stored on the device (0 when there is none). */
+    suspend fun storedImageSize(name: String): Long {
+        val json = JSONObject(rpc("file.stored", timeoutMs = 8000))
+        return if (name.startsWith("slave")) json.optLong("slave", 0) else json.optLong("master", 0)
+    }
+
     /** Flashes a .bin already stored on the device and deletes it afterwards. */
     suspend fun fileOtaFlash(name: String, target: String): Boolean {
         val payload = JSONObject().put("name", name).put("target", target).toString()

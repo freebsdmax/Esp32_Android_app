@@ -311,7 +311,15 @@ class Esp32PlayerRepository @Inject constructor(
         try {
             val mtu = bleClient.ensureMtu()
             if (mtu < 100) throw IllegalStateException("BLE MTU too small ($mtu). Reconnect and retry.")
-            bleClient.fileOtaBegin(firmware.size, target, storeName)
+            // Same image already on the device? Then just flash it - no need to
+            // push 1.6 MB over BLE again.
+            var skipUpload = false
+            if (storeName != null) {
+                val stored = runCatching { bleClient.storedImageSize(storeName) }.getOrDefault(0L)
+                skipUpload = stored == firmware.size.toLong()
+                if (skipUpload) Timber.i("OTA: %s already on device, flashing directly", storeName)
+            }
+            if (!skipUpload) bleClient.fileOtaBegin(firmware.size, target, storeName)
             val total = firmware.size.toLong()
             val uploadMeter = RateTracker()
             var offset = 0
@@ -349,6 +357,7 @@ class Esp32PlayerRepository @Inject constructor(
             }
 
             try {
+                if (!skipUpload) {
                 while (true) {
                     if (attempts++ > 4) {
                         throw IllegalStateException(
@@ -427,6 +436,12 @@ class Esp32PlayerRepository @Inject constructor(
                     if (storeWait >= 240) {
                         throw IllegalStateException("Timeout while saving the image to /storage")
                     }
+                }
+                } else {
+                    emit("apply", total, total, 90, uploadMeter)
+                }
+
+                if (storeName != null) {
                     bleClient.fileOtaFlash(storeName, target)
                     if (target == "master") {
                         emit("apply", total, total, 100, uploadMeter)
