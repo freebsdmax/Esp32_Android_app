@@ -410,9 +410,23 @@ class Esp32PlayerRepository @Inject constructor(
                 bleClient.fileOtaFinish()
 
                 if (storeName != null) {
-                    // The image is on the device now: flash it from /storage and
-                    // let the device delete the file after success.
+                    // The device writes the image into /storage in the background;
+                    // wait until it reports DONE before asking to flash it.
                     emit("apply", 0, total, 91, uploadMeter)
+                    var storeWait = 0
+                    while (storeWait++ < 240) {
+                        val st = bleClient.fileOtaStatus()
+                        if (st.state == 3) break
+                        if (st.state == 4) {
+                            throw IllegalStateException(
+                                "Device failed: " + st.error.ifBlank { "cannot write to /storage" }
+                            )
+                        }
+                        delay(250)
+                    }
+                    if (storeWait >= 240) {
+                        throw IllegalStateException("Timeout while saving the image to /storage")
+                    }
                     bleClient.fileOtaFlash(storeName, target)
                     if (target == "master") {
                         emit("apply", total, total, 100, uploadMeter)
