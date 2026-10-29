@@ -5,6 +5,7 @@ import com.example.androidplayer.ui.viewmodel.OtaViewModel
 import com.example.androidplayer.ui.viewmodel.OtaUiState
 import com.example.androidplayer.ui.components.CardHeader
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Upload
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -105,6 +106,12 @@ fun SettingsScreen(
             AppearanceCard(
                 darkTheme = uiState.darkTheme,
                 onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            MiniPlayerCard(
+                always = uiState.miniPlayerAlways,
+                onChange = { viewModel.updateSetting(SettingsViewModel.MINI_PLAYER_ALWAYS, it) }
             )
         }
         item {
@@ -233,6 +240,40 @@ private fun AppearanceCard(
                     )
                 }
                 Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniPlayerCard(
+    always: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionHeader(
+                icon = Icons.Default.PlayArrow,
+                title = Loc.miniPlayerTitle(),
+                subtitle = Loc.miniPlayerSubtitle()
+            )
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (always) tr("Завжди доступний") else tr("Тільки для флешки"),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        Loc.miniPlayerHint(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = always, onCheckedChange = onChange)
             }
         }
     }

@@ -78,7 +78,8 @@ fun MainNavigation() {
     // short automatic reconnects (watchdog / after an OTA reboot) must not spam it.
     var firstConnectionState by remember { mutableStateOf(true) }
     LaunchedEffect(bleConnected) {
-        if (bleConnected) PlaybackService.start(context) else PlaybackService.stop(context)
+        // The mini player is started/stopped by PlayerViewModel (it depends on the
+        // playback mode); only the connection notifications live here.
         if (firstConnectionState) {
             firstConnectionState = false
             return@LaunchedEffect

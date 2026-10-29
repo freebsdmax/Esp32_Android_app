@@ -90,12 +90,14 @@ class SettingsViewModel @Inject constructor(
         val autoReconnect = prefs.getBoolean("auto_reconnect", true)
         val showNotifications = prefs.getBoolean("show_notifications", true)
         val darkTheme = prefs.getBoolean("dark_theme", false)
+        val miniPlayerAlways = prefs.getBoolean(MINI_PLAYER_ALWAYS, false)
         
         _uiState.value = SettingsUiState(
             esp32Ip = savedIp,
             autoReconnect = autoReconnect,
             showNotifications = showNotifications,
-            darkTheme = darkTheme
+            darkTheme = darkTheme,
+            miniPlayerAlways = miniPlayerAlways
         )
     }
     
@@ -135,6 +137,10 @@ class SettingsViewModel @Inject constructor(
                 prefs.edit().putBoolean("dark_theme", value).apply()
                 _uiState.value = _uiState.value.copy(darkTheme = value)
             }
+            MINI_PLAYER_ALWAYS -> {
+                prefs.edit().putBoolean(MINI_PLAYER_ALWAYS, value).apply()
+                _uiState.value = _uiState.value.copy(miniPlayerAlways = value)
+            }
         }
     }
     
@@ -157,6 +163,10 @@ class SettingsViewModel @Inject constructor(
     
     companion object {
         const val DEFAULT_ESP32_IP = "http://192.168.4.1"
+
+        /** SharedPreferences key: keep the mini player visible in Bluetooth mode. */
+        const val MINI_PLAYER_ALWAYS = "mini_player_always"
+        const val PREFS_NAME = "esp32_player_prefs"
     }
 }
 
@@ -168,6 +178,7 @@ data class SettingsUiState(
     val autoReconnect: Boolean = true,
     val showNotifications: Boolean = true,
     val darkTheme: Boolean = false,
+    val miniPlayerAlways: Boolean = false,
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

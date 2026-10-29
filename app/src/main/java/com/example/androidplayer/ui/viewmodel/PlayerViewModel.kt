@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.androidplayer.data.model.*
 import com.example.androidplayer.data.repository.Esp32PlayerRepository
 import com.example.androidplayer.data.ble.BlePlayerClient
+import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +23,8 @@ import com.example.androidplayer.service.PlaybackService
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repository: Esp32PlayerRepository,
-    val bleClient: BlePlayerClient
+    val bleClient: BlePlayerClient,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -29,17 +32,39 @@ class PlayerViewModel @Inject constructor(
     init {
         // Mirror the device state into the media notification (mini player).
         viewModelScope.launch {
+            var miniVisible: Boolean? = null
             _uiState.collect { state ->
-                val name = state.playlist.getOrNull(state.currentTrack)
-                    ?.substringAfterLast('/')
-                    ?.substringBeforeLast('.')
-                    ?: com.example.androidplayer.ui.i18n.Loc.trackTitle(state.currentTrack + 1)
-                PlaybackService.update(
-                    name,
-                    state.isPaused,
-                    state.positionMs.toLong(),
-                    state.durationMs.toLong()
-                )
+                val name = when {
+                    state.mode == "external" && state.mediaTitle.isNotBlank() ->
+                        listOfNotNull(state.mediaArtist.takeIf { it.isNotBlank() }, state.mediaTitle)
+                            .joinToString(" — ")
+                    state.playlist.getOrNull(state.currentTrack) != null ->
+                        state.playlist[state.currentTrack]
+                            .substringAfterLast('/')
+                            .substringBeforeLast('.')
+                    else -> com.example.androidplayer.ui.i18n.Loc.trackTitle(state.currentTrack + 1)
+                }
+
+                /* The mini player is only useful when the device itself plays (USB).
+                   In Bluetooth mode the sound is controlled from the phone, so it is
+                   hidden - unless the user enabled "always show" in Settings. */
+                val always = appContext
+                    .getSharedPreferences(SettingsViewModel.PREFS_NAME, Context.MODE_PRIVATE)
+                    .getBoolean(SettingsViewModel.MINI_PLAYER_ALWAYS, false)
+                val show = bleClient.isConnected.value && (state.mode != "external" || always)
+
+                if (show != miniVisible) {
+                    miniVisible = show
+                    if (show) PlaybackService.start(appContext) else PlaybackService.stop(appContext)
+                }
+                if (show) {
+                    PlaybackService.update(
+                        name,
+                        state.isPaused,
+                        state.positionMs.toLong(),
+                        state.durationMs.toLong()
+                    )
+                }
             }
         }
     }

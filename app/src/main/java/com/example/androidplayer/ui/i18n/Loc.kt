@@ -288,6 +288,14 @@ object Loc {
         if (isUkrainian) "Показано збережені дані (GitHub зараз недоступний)"
         else "Showing cached data (GitHub is unavailable right now)"
 
+    fun miniPlayerTitle(): String =
+        if (isUkrainian) "Міні-плеєр у шторці" else "Mini player in the shade"
+    fun miniPlayerSubtitle(): String =
+        if (isUkrainian) "Показувати завжди, навіть для Bluetooth" else "Always show, even for Bluetooth"
+    fun miniPlayerHint(): String =
+        if (isUkrainian) "Вимкнено: у режимі Bluetooth міні-плеєр ховається (звук іде з телефона)."
+        else "Off: hidden in Bluetooth mode (audio comes from the phone)."
+
     fun fwManualTitle(): String = if (isUkrainian) "Прошивка вручну" else "Manual firmware"
     fun fwManualSubtitle(): String =
         if (isUkrainian) "Файл .bin з телефона" else ".bin file from the phone"
