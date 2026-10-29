@@ -291,6 +291,17 @@ class PlayerViewModel @Inject constructor(
     }
     
     /**
+     * Relative seek (used by the -10 s / +10 s buttons in Bluetooth mode:
+     * AVRCP has no absolute seek, the device converts this into FF/REW steps).
+     */
+    fun seekBy(deltaMs: Int) {
+        val state = _uiState.value
+        val target = (state.positionMs + deltaMs).coerceAtLeast(0)
+        val limit = if (state.durationMs > 0) state.durationMs else target
+        setPosition(target.coerceAtMost(limit))
+    }
+
+    /**
      * Очистка ошибки
      */
     fun clearError() {

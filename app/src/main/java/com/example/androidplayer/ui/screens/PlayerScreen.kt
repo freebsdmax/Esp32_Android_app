@@ -1,6 +1,7 @@
 package com.example.androidplayer.ui.screens
 
 import com.example.androidplayer.ui.i18n.tr
+import com.example.androidplayer.ui.i18n.Loc
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -123,7 +124,8 @@ fun PlayerScreen(
         item {
             PlaybackPosition(
                 uiState = uiState,
-                onPositionChange = { position -> viewModel.setPosition(position) }
+                onPositionChange = { position -> viewModel.setPosition(position) },
+                onSeekBy = { delta -> viewModel.seekBy(delta) }
             )
         }
 
@@ -404,7 +406,8 @@ private fun PlayerControls(
 @Composable
 private fun PlaybackPosition(
     uiState: PlayerUiState,
-    onPositionChange: (Int) -> Unit
+    onPositionChange: (Int) -> Unit,
+    onSeekBy: (Int) -> Unit
 ) {
     if (uiState.durationMs > 0) {
         Card(
@@ -434,44 +437,90 @@ private fun PlaybackPosition(
                     )
                 }
 
-                var isSeeking by remember { mutableStateOf(false) }
-                var sliderPosition by remember { mutableStateOf(0f) }
+                val external = uiState.mode == "external"
 
-                LaunchedEffect(uiState.positionMs, uiState.durationMs) {
-                    if (!isSeeking && uiState.durationMs > 0) {
-                        sliderPosition = uiState.positionMs.toFloat() / uiState.durationMs
+                if (external) {
+                    /* Bluetooth: AVRCP cannot set an absolute position, so a slider
+                       would always lie. Two step buttons send a relative seek. */
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onSeekBy(-10000) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(Loc.seekBack10())
+                        }
+                        OutlinedButton(
+                            onClick = { onSeekBy(10000) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(Loc.seekFwd10())
+                        }
                     }
-                }
-
-                Slider(
-                    value = sliderPosition.coerceIn(0f..1f),
-                    onValueChange = { newValue ->
-                        sliderPosition = newValue
-                        isSeeking = true
-                    },
-                    onValueChangeFinished = {
-                        val newMs = (sliderPosition * uiState.durationMs).toInt()
-                        onPositionChange(newMs)
-                        isSeeking = false
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val displayMs = if (isSeeking) (sliderPosition * uiState.durationMs).toInt() else uiState.positionMs
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = formatTime(uiState.positionMs),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = formatTime(uiState.durationMs),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Text(
-                        text = formatTime(displayMs),
-                        style = MaterialTheme.typography.labelLarge,
+                        text = Loc.seekHint(),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        text = formatTime(uiState.durationMs),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    var isSeeking by remember { mutableStateOf(false) }
+                    var sliderPosition by remember { mutableStateOf(0f) }
+
+                    LaunchedEffect(uiState.positionMs, uiState.durationMs) {
+                        if (!isSeeking && uiState.durationMs > 0) {
+                            sliderPosition = uiState.positionMs.toFloat() / uiState.durationMs
+                        }
+                    }
+
+                    Slider(
+                        value = sliderPosition.coerceIn(0f..1f),
+                        onValueChange = { newValue ->
+                            sliderPosition = newValue
+                            isSeeking = true
+                        },
+                        onValueChangeFinished = {
+                            val newMs = (sliderPosition * uiState.durationMs).toInt()
+                            onPositionChange(newMs)
+                            isSeeking = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val displayMs = if (isSeeking) (sliderPosition * uiState.durationMs).toInt() else uiState.positionMs
+                        Text(
+                            text = formatTime(displayMs),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = formatTime(uiState.durationMs),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }

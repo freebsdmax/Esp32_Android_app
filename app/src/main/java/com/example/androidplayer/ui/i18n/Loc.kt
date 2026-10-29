@@ -278,6 +278,12 @@ object Loc {
     fun updateErrorNetwork(): String =
         if (isUkrainian) "Немає зв'язку з GitHub. Перевірте інтернет і спробуйте ще раз."
         else "Cannot reach GitHub. Check your internet connection and retry."
+    fun seekBack10(): String = if (isUkrainian) "−10 с" else "−10 s"
+    fun seekFwd10(): String = if (isUkrainian) "+10 с" else "+10 s"
+    fun seekHint(): String =
+        if (isUkrainian) "Точна перемотка — тільки з телефона (AVRCP не вміє задавати позицію)"
+        else "Exact seek is only possible on the phone (AVRCP cannot set a position)"
+
     fun updateFromCache(): String =
         if (isUkrainian) "Показано збережені дані (GitHub зараз недоступний)"
         else "Showing cached data (GitHub is unavailable right now)"
