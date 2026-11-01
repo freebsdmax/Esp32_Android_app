@@ -500,6 +500,14 @@ class Esp32PlayerRepository @Inject constructor(
     // МОНИТОРИНГ
     // ========================================================================
     
+    suspend fun getSeekConfig(): Result<BlePlayerClient.SeekConfig> = safeApiCall {
+        bleClient.getSeekConfig()
+    }
+
+    suspend fun setSeekConfig(stepSeconds: Int, hold: Boolean): Result<BlePlayerClient.SeekConfig> = safeApiCall {
+        bleClient.setSeekConfig(stepSeconds, hold)
+    }
+
     suspend fun getVolume(): Result<Int> = safeApiCall {
         bleClient.getVolume()
     }

@@ -32,6 +32,41 @@ class SettingsViewModel @Inject constructor(
     init {
         loadSettings()
         loadSleepSettings()
+        loadSeekConfig()
+    }
+
+    /** Крок і метод перемотки зберігаються на платі (NVS Master + Slave). */
+    fun loadSeekConfig() {
+        viewModelScope.launch {
+            repository.getSeekConfig().onSuccess { cfg ->
+                _uiState.value = _uiState.value.copy(
+                    seekStepSeconds = cfg.stepSeconds,
+                    seekHold = cfg.hold
+                )
+            }.onFailure { Timber.w(it, "Failed to load seek config") }
+        }
+    }
+
+    fun setSeekConfig(stepSeconds: Int, hold: Boolean) {
+        _uiState.value = _uiState.value.copy(seekStepSeconds = stepSeconds, seekHold = hold)
+        viewModelScope.launch {
+            repository.setSeekConfig(stepSeconds, hold).fold(
+                onSuccess = { cfg ->
+                    _uiState.value = _uiState.value.copy(
+                        seekStepSeconds = cfg.stepSeconds,
+                        seekHold = cfg.hold,
+                        isSaved = true,
+                        saveMessage = tr("Налаштування перемотки збережено")
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = false,
+                        saveMessage = error.message ?: "Failed to save seek settings"
+                    )
+                }
+            )
+        }
     }
 
     /** Read the sleep/idle configuration from the device. */
@@ -179,6 +214,8 @@ data class SettingsUiState(
     val showNotifications: Boolean = true,
     val darkTheme: Boolean = false,
     val miniPlayerAlways: Boolean = false,
+    val seekStepSeconds: Int = 10,
+    val seekHold: Boolean = false,
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

@@ -783,6 +783,19 @@ class BlePlayerClient(context: Context) {
         )
     }
 
+    data class SeekConfig(val stepSeconds: Int = 10, val hold: Boolean = false)
+
+    suspend fun getSeekConfig(): SeekConfig {
+        val json = JSONObject(rpc("seek.get"))
+        return SeekConfig(json.optInt("step_s", 10), json.optInt("mode", 0) == 1)
+    }
+
+    suspend fun setSeekConfig(stepSeconds: Int, hold: Boolean): SeekConfig {
+        val payload = JSONObject().put("step_s", stepSeconds).put("mode", if (hold) 1 else 0).toString()
+        val json = JSONObject(rpc("seek.set", payload))
+        return SeekConfig(json.optInt("step_s", stepSeconds), json.optInt("mode", 0) == 1)
+    }
+
     suspend fun getVolume(): Int =
         JSONObject(rpc("volume.get")).optInt("volume", 80)
 

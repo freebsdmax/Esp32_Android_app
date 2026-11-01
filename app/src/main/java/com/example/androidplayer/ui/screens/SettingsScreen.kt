@@ -5,6 +5,7 @@ import com.example.androidplayer.ui.viewmodel.OtaViewModel
 import com.example.androidplayer.ui.viewmodel.OtaUiState
 import com.example.androidplayer.ui.components.CardHeader
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Upload
 import androidx.activity.result.contract.ActivityResultContracts
@@ -106,6 +107,13 @@ fun SettingsScreen(
             AppearanceCard(
                 darkTheme = uiState.darkTheme,
                 onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            SeekCard(
+                stepSeconds = uiState.seekStepSeconds,
+                hold = uiState.seekHold,
+                onChange = { step, holdMode -> viewModel.setSeekConfig(step, holdMode) }
             )
         }
         item {
@@ -457,6 +465,59 @@ private fun SavedBanner(message: String) {
             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             Spacer(Modifier.width(10.dp))
             Text(message, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SeekCard(
+    stepSeconds: Int,
+    hold: Boolean,
+    onChange: (Int, Boolean) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.FastForward,
+                title = tr("Перемотка (Bluetooth)"),
+                subtitle = tr("Крок і метод діють на платі")
+            )
+
+            Text(
+                tr("Крок одного натискання"),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(5, 10, 15, 30).forEach { step ->
+                    FilterChip(
+                        selected = stepSeconds == step,
+                        onClick = { onChange(step, hold) },
+                        label = { Text("$step с") }
+                    )
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        tr("Довге утримання"),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        if (hold) tr("Одне утримання замість кількох натискань")
+                        else tr("Кілька коротких натискань"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = hold, onCheckedChange = { onChange(stepSeconds, it) })
+            }
         }
     }
 }
