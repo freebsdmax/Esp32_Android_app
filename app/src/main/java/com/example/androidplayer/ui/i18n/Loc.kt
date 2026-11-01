@@ -311,8 +311,8 @@ object Loc {
         if (isUkrainian) "Образ збережено у Завантаження: $name"
         else "Image saved to Downloads: $name"
 
-    fun usbTargetMaster(): String = if (isUkrainian) "Master (цей пристрій)" else "Master (this device)"
-    fun usbTargetSlave(): String = if (isUkrainian) "Slave (Bluetooth-модуль)" else "Slave (Bluetooth module)"
+    fun usbTargetMaster(): String = "Master Player"
+    fun usbTargetSlave(): String = "Slave (Bluetooth)"
     fun usbTargetTitle(): String = if (isUkrainian) "Яку плату прошиваємо" else "Which board to flash"
 
     fun usbTitle(): String = if (isUkrainian) "Прошивка по кабелю" else "Firmware over cable"

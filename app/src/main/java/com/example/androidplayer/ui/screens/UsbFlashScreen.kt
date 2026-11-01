@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -45,7 +47,10 @@ import com.example.androidplayer.ui.viewmodel.UsbFlashViewModel
 /**
  * Аварійна прошивка плати по USB-кабелю з телефона.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
 @Composable
 fun UsbFlashScreen(
     viewModel: UsbFlashViewModel = hiltViewModel()
@@ -130,7 +135,10 @@ fun UsbFlashScreen(
                     Text(Loc.usbTargetTitle(), style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold)
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         FilterChip(
                             selected = state.target == "master",
                             onClick = { viewModel.setTarget("master") },
