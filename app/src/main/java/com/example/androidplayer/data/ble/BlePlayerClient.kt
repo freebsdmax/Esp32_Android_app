@@ -783,6 +783,17 @@ class BlePlayerClient(context: Context) {
         )
     }
 
+    suspend fun getBleName(): String =
+        JSONObject(rpc("ble.get")).optString("name", "")
+
+    /** @return true, якщо потрібне перезавантаження плати */
+    suspend fun setBleName(name: String): Boolean {
+        val payload = JSONObject().put("name", name).toString()
+        val json = JSONObject(rpc("ble.set", payload))
+        if (!json.optBoolean("success")) throw IllegalStateException("Name rejected")
+        return json.optBoolean("reboot_required", true)
+    }
+
     data class AuthConfig(val enabled: Boolean = false, val token: String = "")
 
     suspend fun getAuth(): AuthConfig {

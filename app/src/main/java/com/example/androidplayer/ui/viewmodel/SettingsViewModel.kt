@@ -35,6 +35,7 @@ class SettingsViewModel @Inject constructor(
         loadSeekConfig()
         loadCanConfig()
         loadAuthConfig()
+        loadBleName()
     }
 
     /** Крок і метод перемотки зберігаються на платі (NVS Master + Slave). */
@@ -184,6 +185,39 @@ class SettingsViewModel @Inject constructor(
     /**
      * Сброс сообщения о сохранении
      */
+    fun loadBleName() {
+        viewModelScope.launch {
+            repository.getBleName().onSuccess { name ->
+                _uiState.value = _uiState.value.copy(bleName = name)
+            }.onFailure { Timber.w(it, "Failed to load BLE name") }
+        }
+    }
+
+    fun setBleNameText(text: String) {
+        _uiState.value = _uiState.value.copy(bleName = text.take(31))
+    }
+
+    fun saveBleName() {
+        val name = _uiState.value.bleName.trim()
+        if (name.isEmpty()) return
+        viewModelScope.launch {
+            repository.setBleName(name).fold(
+                onSuccess = {
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = true,
+                        saveMessage = tr("Ім'я збережено — застосується після перезавантаження плати")
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = false,
+                        saveMessage = error.message ?: "Failed to save name"
+                    )
+                }
+            )
+        }
+    }
+
     fun loadAuthConfig() {
         viewModelScope.launch {
             repository.getAuth().onSuccess { cfg ->
@@ -326,6 +360,7 @@ data class SettingsUiState(
     val canDebounceMs: Int = 500,
     val webToken: String = "",
     val webTokenEnabled: Boolean = false,
+    val bleName: String = "",
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

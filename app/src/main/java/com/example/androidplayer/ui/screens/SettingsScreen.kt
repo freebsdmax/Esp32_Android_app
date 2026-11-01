@@ -112,6 +112,13 @@ fun SettingsScreen(
             )
         }
         item {
+            BleNameCard(
+                name = uiState.bleName,
+                onChange = { viewModel.setBleNameText(it) },
+                onSave = { viewModel.saveBleName() }
+            )
+        }
+        item {
             AuthCard(
                 token = uiState.webToken,
                 enabled = uiState.webTokenEnabled,
@@ -668,6 +675,42 @@ private fun AuthCard(
                 label = { Text(tr("Токен (порожній = вимкнути)")) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
+            )
+            Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Зберегти"))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BleNameCard(
+    name: String,
+    onChange: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.BluetoothConnected,
+                title = tr("Ім'я пристрою (BLE)"),
+                subtitle = tr("Те, що бачить телефон при скануванні")
+            )
+            OutlinedTextField(
+                value = name,
+                onValueChange = onChange,
+                label = { Text(tr("Назва (до 31 символа)")) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                tr("Застосується після перезавантаження плати"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
                 Text(tr("Зберегти"))
