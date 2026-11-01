@@ -794,6 +794,14 @@ class BlePlayerClient(context: Context) {
         return json.optBoolean("reboot_required", true)
     }
 
+    suspend fun getAudioProfile(): Int =
+        JSONObject(rpc("audio.get")).optInt("profile", 1)
+
+    suspend fun setAudioProfile(profile: Int): Int {
+        val payload = JSONObject().put("profile", profile).toString()
+        return JSONObject(rpc("audio.set", payload)).optInt("profile", profile)
+    }
+
     data class LogsConfig(val bufferKb: Int = 4, val persist: Boolean = true)
 
     suspend fun getLogsConfig(): LogsConfig {

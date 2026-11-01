@@ -38,6 +38,7 @@ class SettingsViewModel @Inject constructor(
         loadAuthConfig()
         loadBleName()
         loadLogsConfig()
+        loadAudioProfile()
     }
 
     /** Крок і метод перемотки зберігаються на платі (NVS Master + Slave). */
@@ -203,6 +204,35 @@ class SettingsViewModel @Inject constructor(
     fun setUpdateChannel(beta: Boolean) {
         checker.betaChannel = beta
         _uiState.value = _uiState.value.copy(updateBeta = beta)
+    }
+
+    fun loadAudioProfile() {
+        viewModelScope.launch {
+            repository.getAudioProfile().onSuccess { p ->
+                _uiState.value = _uiState.value.copy(audioProfile = p)
+            }.onFailure { Timber.w(it, "Failed to load audio profile") }
+        }
+    }
+
+    fun saveAudioProfile(profile: Int) {
+        _uiState.value = _uiState.value.copy(audioProfile = profile)
+        viewModelScope.launch {
+            repository.setAudioProfile(profile).fold(
+                onSuccess = { applied ->
+                    _uiState.value = _uiState.value.copy(
+                        audioProfile = applied,
+                        isSaved = true,
+                        saveMessage = tr("Профіль збережено — застосується після перезавантаження")
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = false,
+                        saveMessage = error.message ?: "Failed to save profile"
+                    )
+                }
+            )
+        }
     }
 
     fun loadLogsConfig() {
@@ -429,6 +459,7 @@ data class SettingsUiState(
     val updateAuto: Boolean = true,
     val updateIntervalHours: Int = 12,
     val updateBeta: Boolean = false,
+    val audioProfile: Int = 1,
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

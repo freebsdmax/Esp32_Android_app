@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Upload
@@ -111,6 +112,12 @@ fun SettingsScreen(
             AppearanceCard(
                 darkTheme = uiState.darkTheme,
                 onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            AudioProfileCard(
+                profile = uiState.audioProfile,
+                onSelect = { viewModel.saveAudioProfile(it) }
             )
         }
         item {
@@ -864,6 +871,48 @@ private fun UpdatesAutoCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AudioProfileCard(
+    profile: Int,
+    onSelect: (Int) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.GraphicEq,
+                title = tr("Аудіо-буфери"),
+                subtitle = tr("Затримка проти стійкості до затинів")
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = profile == 0,
+                    onClick = { onSelect(0) },
+                    label = { Text(tr("Низька")) }
+                )
+                FilterChip(
+                    selected = profile == 1,
+                    onClick = { onSelect(1) },
+                    label = { Text(tr("Збалансований")) }
+                )
+                FilterChip(
+                    selected = profile == 2,
+                    onClick = { onSelect(2) },
+                    label = { Text(tr("Стійкий")) }
+                )
+            }
+            Text(
+                tr("Застосовується після зміни режиму або перезавантаження плати"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

@@ -500,6 +500,14 @@ class Esp32PlayerRepository @Inject constructor(
     // МОНИТОРИНГ
     // ========================================================================
     
+    suspend fun getAudioProfile(): Result<Int> = safeApiCall {
+        bleClient.getAudioProfile()
+    }
+
+    suspend fun setAudioProfile(profile: Int): Result<Int> = safeApiCall {
+        bleClient.setAudioProfile(profile)
+    }
+
     suspend fun getLogsConfig(): Result<BlePlayerClient.LogsConfig> = safeApiCall {
         bleClient.getLogsConfig()
     }
