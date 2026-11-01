@@ -7,6 +7,7 @@ import com.example.androidplayer.ui.components.CardHeader
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Upload
 import androidx.activity.result.contract.ActivityResultContracts
@@ -108,6 +109,14 @@ fun SettingsScreen(
             AppearanceCard(
                 darkTheme = uiState.darkTheme,
                 onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            AuthCard(
+                token = uiState.webToken,
+                enabled = uiState.webTokenEnabled,
+                onToken = { viewModel.setWebToken(it) },
+                onSave = { viewModel.saveWebToken() }
             )
         }
         item {
@@ -621,6 +630,45 @@ private fun CanCard(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Зберегти"))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AuthCard(
+    token: String,
+    enabled: Boolean,
+    onToken: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.Lock,
+                title = tr("Доступ до веб-інтерфейсу"),
+                subtitle = tr("Токен для HTTP/OTA")
+            )
+            Text(
+                if (enabled) tr("Захищено: веб і OTA вимагають токен")
+                else tr("Відкрито: будь-хто в мережі може прошити плату"),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (enabled) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.error
+            )
+            OutlinedTextField(
+                value = token,
+                onValueChange = onToken,
+                label = { Text(tr("Токен (порожній = вимкнути)")) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
             Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
                 Text(tr("Зберегти"))
             }

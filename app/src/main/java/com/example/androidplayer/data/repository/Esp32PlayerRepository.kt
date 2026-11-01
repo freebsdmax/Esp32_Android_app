@@ -500,6 +500,14 @@ class Esp32PlayerRepository @Inject constructor(
     // МОНИТОРИНГ
     // ========================================================================
     
+    suspend fun getAuth(): Result<BlePlayerClient.AuthConfig> = safeApiCall {
+        bleClient.getAuth()
+    }
+
+    suspend fun setAuth(token: String): Result<BlePlayerClient.AuthConfig> = safeApiCall {
+        bleClient.setAuth(token)
+    }
+
     suspend fun getCanConfig(): Result<BlePlayerClient.CanConfig> = safeApiCall {
         bleClient.getCanConfig()
     }

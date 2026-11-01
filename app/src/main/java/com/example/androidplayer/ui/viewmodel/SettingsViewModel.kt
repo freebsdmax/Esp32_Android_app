@@ -34,6 +34,7 @@ class SettingsViewModel @Inject constructor(
         loadSleepSettings()
         loadSeekConfig()
         loadCanConfig()
+        loadAuthConfig()
     }
 
     /** Крок і метод перемотки зберігаються на платі (NVS Master + Slave). */
@@ -183,6 +184,44 @@ class SettingsViewModel @Inject constructor(
     /**
      * Сброс сообщения о сохранении
      */
+    fun loadAuthConfig() {
+        viewModelScope.launch {
+            repository.getAuth().onSuccess { cfg ->
+                _uiState.value = _uiState.value.copy(
+                    webToken = cfg.token,
+                    webTokenEnabled = cfg.enabled
+                )
+            }.onFailure { Timber.w(it, "Failed to load auth config") }
+        }
+    }
+
+    fun setWebToken(text: String) {
+        _uiState.value = _uiState.value.copy(webToken = text.take(32))
+    }
+
+    fun saveWebToken() {
+        val token = _uiState.value.webToken.trim()
+        viewModelScope.launch {
+            repository.setAuth(token).fold(
+                onSuccess = { cfg ->
+                    _uiState.value = _uiState.value.copy(
+                        webToken = cfg.token,
+                        webTokenEnabled = cfg.enabled,
+                        isSaved = true,
+                        saveMessage = if (cfg.enabled) tr("Токен збережено — веб-інтерфейс захищено")
+                        else tr("Токен вимкнено — доступ відкритий")
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = false,
+                        saveMessage = error.message ?: "Failed to save token"
+                    )
+                }
+            )
+        }
+    }
+
     fun loadCanConfig() {
         viewModelScope.launch {
             repository.getCanConfig().onSuccess { cfg ->
@@ -285,6 +324,8 @@ data class SettingsUiState(
     val canMaskPrev: Int = 0x80,
     val canMaskMode: Int = 0x10,
     val canDebounceMs: Int = 500,
+    val webToken: String = "",
+    val webTokenEnabled: Boolean = false,
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

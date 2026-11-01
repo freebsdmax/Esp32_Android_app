@@ -783,6 +783,22 @@ class BlePlayerClient(context: Context) {
         )
     }
 
+    data class AuthConfig(val enabled: Boolean = false, val token: String = "")
+
+    suspend fun getAuth(): AuthConfig {
+        val json = JSONObject(rpc("auth.get"))
+        return AuthConfig(json.optBoolean("enabled"), json.optString("token"))
+    }
+
+    suspend fun setAuth(token: String): AuthConfig {
+        val payload = JSONObject().put("token", token).toString()
+        val json = JSONObject(rpc("auth.set", payload))
+        if (!json.optBoolean("success")) {
+            throw IllegalStateException("Token was rejected")
+        }
+        return AuthConfig(json.optBoolean("enabled"), json.optString("token"))
+    }
+
     data class CanConfig(
         val bitrate: Int = 125,
         val id: Long = 0x2D5,
