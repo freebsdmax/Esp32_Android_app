@@ -500,6 +500,14 @@ class Esp32PlayerRepository @Inject constructor(
     // МОНИТОРИНГ
     // ========================================================================
     
+    suspend fun getVolume(): Result<Int> = safeApiCall {
+        bleClient.getVolume()
+    }
+
+    suspend fun setVolume(percent: Int): Result<Int> = safeApiCall {
+        bleClient.setVolume(percent)
+    }
+
     suspend fun getMedia(): Result<MediaInfo> = safeApiCall {
         bleClient.getMedia()
     }

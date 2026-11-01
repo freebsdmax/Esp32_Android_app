@@ -122,6 +122,11 @@ fun PlayerScreen(
         }
 
         item {
+            VolumeRow(
+                volume = uiState.volume,
+                onCommit = { viewModel.setVolume(it) }
+            )
+
             PlaybackPosition(
                 uiState = uiState,
                 onPositionChange = { position -> viewModel.setPosition(position) }
@@ -535,4 +540,40 @@ private fun formatTime(milliseconds: Int): String {
     val minutes = totalSeconds / 60
     val remainingSeconds = totalSeconds % 60
     return "%d:%02d".format(minutes, remainingSeconds)
+}
+
+@Composable
+private fun VolumeRow(volume: Int, onCommit: (Int) -> Unit) {
+    var value by remember(volume) { mutableStateOf(volume / 100f) }
+    LaunchedEffect(volume) { value = volume / 100f }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.VolumeUp,
+                contentDescription = tr("Гучність"),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(8.dp))
+            Slider(
+                value = value,
+                onValueChange = { value = it },
+                onValueChangeFinished = { onCommit((value * 100).toInt().coerceIn(0, 100)) },
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "${(value * 100).toInt()}%",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }

@@ -107,6 +107,29 @@ class PlayerViewModel @Inject constructor(
         loadPlayerStatus()
         loadPlaylist()
         refreshMedia()
+        refreshVolume()
+    }
+
+    /** Software volume of the device (0..100 %). */
+    fun refreshVolume() {
+        viewModelScope.launch {
+            repository.getVolume().onSuccess { v ->
+                _uiState.value = _uiState.value.copy(volume = v)
+            }
+        }
+    }
+
+    fun setVolume(percent: Int) {
+        val v = percent.coerceIn(0, 100)
+        _uiState.value = _uiState.value.copy(volume = v)
+        viewModelScope.launch {
+            repository.setVolume(v).fold(
+                onSuccess = { applied -> _uiState.value = _uiState.value.copy(volume = applied) },
+                onFailure = { error ->
+                    _error.value = tr("Помилка гучності: %s").format(error.message ?: error.toString())
+                }
+            )
+        }
     }
     
     /**
@@ -409,6 +432,8 @@ data class PlayerUiState(
     val playlist: List<String> = emptyList(),
     val mode: String = "USB", // "USB" или "external"
     val snifferEnabled: Boolean = false,
+    /** 0..100 % */
+    val volume: Int = 80,
     /** Зараз грає на телефоні (Bluetooth): назва / виконавець */
     val mediaTitle: String = "",
     val mediaArtist: String = ""

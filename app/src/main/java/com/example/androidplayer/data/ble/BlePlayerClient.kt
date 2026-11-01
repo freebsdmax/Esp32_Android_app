@@ -783,6 +783,15 @@ class BlePlayerClient(context: Context) {
         )
     }
 
+    suspend fun getVolume(): Int =
+        JSONObject(rpc("volume.get")).optInt("volume", 80)
+
+    suspend fun setVolume(percent: Int): Int {
+        val v = percent.coerceIn(0, 100)
+        val json = JSONObject(rpc("volume.set", v.toString()))
+        return json.optInt("volume", v)
+    }
+
     suspend fun getMedia(): com.example.androidplayer.data.model.MediaInfo {
         val json = JSONObject(rpc("media.get"))
         return com.example.androidplayer.data.model.MediaInfo(
