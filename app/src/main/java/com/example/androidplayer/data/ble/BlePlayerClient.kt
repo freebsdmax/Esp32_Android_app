@@ -783,6 +783,43 @@ class BlePlayerClient(context: Context) {
         )
     }
 
+    data class CanConfig(
+        val bitrate: Int = 125,
+        val id: Long = 0x2D5,
+        val maskNext: Int = 0x40,
+        val maskPrev: Int = 0x80,
+        val maskMode: Int = 0x10,
+        val debounceMs: Int = 500
+    )
+
+    suspend fun getCanConfig(): CanConfig {
+        val json = JSONObject(rpc("can.get"))
+        return CanConfig(
+            bitrate = json.optInt("bitrate", 125),
+            id = json.optLong("id", 0x2D5),
+            maskNext = json.optInt("mask_next", 0x40),
+            maskPrev = json.optInt("mask_prev", 0x80),
+            maskMode = json.optInt("mask_mode", 0x10),
+            debounceMs = json.optInt("debounce_ms", 500)
+        )
+    }
+
+    suspend fun setCanConfig(cfg: CanConfig): CanConfig {
+        val payload = JSONObject()
+            .put("bitrate", cfg.bitrate)
+            .put("id", cfg.id)
+            .put("mask_next", cfg.maskNext)
+            .put("mask_prev", cfg.maskPrev)
+            .put("mask_mode", cfg.maskMode)
+            .put("debounce_ms", cfg.debounceMs)
+            .toString()
+        val json = JSONObject(rpc("can.set", payload))
+        if (!json.optBoolean("success")) {
+            throw IllegalStateException(json.optString("error", "CAN settings rejected"))
+        }
+        return getCanConfig()
+    }
+
     data class SeekConfig(val stepSeconds: Int = 10, val hold: Boolean = false)
 
     suspend fun getSeekConfig(): SeekConfig {

@@ -33,6 +33,7 @@ class SettingsViewModel @Inject constructor(
         loadSettings()
         loadSleepSettings()
         loadSeekConfig()
+        loadCanConfig()
     }
 
     /** Крок і метод перемотки зберігаються на платі (NVS Master + Slave). */
@@ -182,6 +183,68 @@ class SettingsViewModel @Inject constructor(
     /**
      * Сброс сообщения о сохранении
      */
+    fun loadCanConfig() {
+        viewModelScope.launch {
+            repository.getCanConfig().onSuccess { cfg ->
+                _uiState.value = _uiState.value.copy(
+                    canBitrate = cfg.bitrate,
+                    canId = cfg.id,
+                    canMaskNext = cfg.maskNext,
+                    canMaskPrev = cfg.maskPrev,
+                    canMaskMode = cfg.maskMode,
+                    canDebounceMs = cfg.debounceMs
+                )
+            }.onFailure { Timber.w(it, "Failed to load CAN config") }
+        }
+    }
+
+    fun saveCanConfig() {
+        val st = _uiState.value
+        viewModelScope.launch {
+            val cfg = com.example.androidplayer.data.ble.BlePlayerClient.CanConfig(
+                bitrate = st.canBitrate,
+                id = st.canId,
+                maskNext = st.canMaskNext,
+                maskPrev = st.canMaskPrev,
+                maskMode = st.canMaskMode,
+                debounceMs = st.canDebounceMs
+            )
+            repository.setCanConfig(cfg).fold(
+                onSuccess = { saved ->
+                    _uiState.value = _uiState.value.copy(
+                        canBitrate = saved.bitrate,
+                        canId = saved.id,
+                        canMaskNext = saved.maskNext,
+                        canMaskPrev = saved.maskPrev,
+                        canMaskMode = saved.maskMode,
+                        canDebounceMs = saved.debounceMs,
+                        isSaved = true,
+                        saveMessage = tr("Налаштування CAN збережено")
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = false,
+                        saveMessage = error.message ?: "Failed to save CAN settings"
+                    )
+                }
+            )
+        }
+    }
+
+    fun setCanField(key: String, value: Long) {
+        val st = _uiState.value
+        _uiState.value = when (key) {
+            "bitrate" -> st.copy(canBitrate = value.toInt())
+            "id" -> st.copy(canId = value)
+            "mask_next" -> st.copy(canMaskNext = value.toInt())
+            "mask_prev" -> st.copy(canMaskPrev = value.toInt())
+            "mask_mode" -> st.copy(canMaskMode = value.toInt())
+            "debounce" -> st.copy(canDebounceMs = value.toInt())
+            else -> st
+        }
+    }
+
     fun clearSaveMessage() {
         _uiState.value = _uiState.value.copy(
             isSaved = false,
@@ -216,6 +279,12 @@ data class SettingsUiState(
     val miniPlayerAlways: Boolean = false,
     val seekStepSeconds: Int = 10,
     val seekHold: Boolean = false,
+    val canBitrate: Int = 125,
+    val canId: Long = 0x2D5,
+    val canMaskNext: Int = 0x40,
+    val canMaskPrev: Int = 0x80,
+    val canMaskMode: Int = 0x10,
+    val canDebounceMs: Int = 500,
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

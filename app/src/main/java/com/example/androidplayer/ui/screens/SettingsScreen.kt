@@ -5,6 +5,7 @@ import com.example.androidplayer.ui.viewmodel.OtaViewModel
 import com.example.androidplayer.ui.viewmodel.OtaUiState
 import com.example.androidplayer.ui.components.CardHeader
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Upload
@@ -107,6 +108,19 @@ fun SettingsScreen(
             AppearanceCard(
                 darkTheme = uiState.darkTheme,
                 onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            CanCard(
+                bitrate = uiState.canBitrate,
+                id = uiState.canId,
+                maskNext = uiState.canMaskNext,
+                maskPrev = uiState.canMaskPrev,
+                maskMode = uiState.canMaskMode,
+                debounceMs = uiState.canDebounceMs,
+                onBitrate = { viewModel.setCanField("bitrate", it.toLong()) },
+                onField = { key, value -> viewModel.setCanField(key, value) },
+                onSave = { viewModel.saveCanConfig() }
             )
         }
         item {
@@ -517,6 +531,98 @@ private fun SeekCard(
                     )
                 }
                 Switch(checked = hold, onCheckedChange = { onChange(stepSeconds, it) })
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CanCard(
+    bitrate: Int,
+    id: Long,
+    maskNext: Int,
+    maskPrev: Int,
+    maskMode: Int,
+    debounceMs: Int,
+    onBitrate: (Int) -> Unit,
+    onField: (String, Long) -> Unit,
+    onSave: () -> Unit
+) {
+    var idText by remember(id) { mutableStateOf("0x" + id.toString(16).uppercase()) }
+    var mnText by remember(maskNext) { mutableStateOf("0x" + maskNext.toString(16).uppercase()) }
+    var mpText by remember(maskPrev) { mutableStateOf("0x" + maskPrev.toString(16).uppercase()) }
+    var mmText by remember(maskMode) { mutableStateOf("0x" + maskMode.toString(16).uppercase()) }
+    var debText by remember(debounceMs) { mutableStateOf(debounceMs.toString()) }
+
+    fun parseHex(text: String): Long? =
+        text.trim().removePrefix("0x").removePrefix("0X").toLongOrNull(16)
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.DirectionsCar,
+                title = tr("CAN-шина"),
+                subtitle = tr("Швидкість, ID кнопок і маски")
+            )
+
+            Text(tr("Швидкість"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(125, 250, 500).forEach { rate ->
+                    FilterChip(
+                        selected = bitrate == rate,
+                        onClick = { onBitrate(rate) },
+                        label = { Text("$rate") }
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = idText,
+                onValueChange = { idText = it; parseHex(it)?.let { v -> onField("id", v) } },
+                label = { Text(tr("ID кнопок (hex)")) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = mnText,
+                    onValueChange = { mnText = it; parseHex(it)?.let { v -> onField("mask_next", v) } },
+                    label = { Text(tr("NEXT")) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = mpText,
+                    onValueChange = { mpText = it; parseHex(it)?.let { v -> onField("mask_prev", v) } },
+                    label = { Text(tr("PREV")) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = mmText,
+                    onValueChange = { mmText = it; parseHex(it)?.let { v -> onField("mask_mode", v) } },
+                    label = { Text(tr("MODE")) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            OutlinedTextField(
+                value = debText,
+                onValueChange = { debText = it; it.toLongOrNull()?.let { v -> onField("debounce", v) } },
+                label = { Text(tr("Антибрязкіт, мс")) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Зберегти"))
             }
         }
     }

@@ -500,6 +500,14 @@ class Esp32PlayerRepository @Inject constructor(
     // МОНИТОРИНГ
     // ========================================================================
     
+    suspend fun getCanConfig(): Result<BlePlayerClient.CanConfig> = safeApiCall {
+        bleClient.getCanConfig()
+    }
+
+    suspend fun setCanConfig(cfg: BlePlayerClient.CanConfig): Result<BlePlayerClient.CanConfig> = safeApiCall {
+        bleClient.setCanConfig(cfg)
+    }
+
     suspend fun getSeekConfig(): Result<BlePlayerClient.SeekConfig> = safeApiCall {
         bleClient.getSeekConfig()
     }
