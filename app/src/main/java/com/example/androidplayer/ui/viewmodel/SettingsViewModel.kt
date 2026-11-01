@@ -39,6 +39,7 @@ class SettingsViewModel @Inject constructor(
         loadBleName()
         loadLogsConfig()
         loadAudioProfile()
+        loadNetConfig()
     }
 
     /** Крок і метод перемотки зберігаються на платі (NVS Master + Slave). */
@@ -204,6 +205,61 @@ class SettingsViewModel @Inject constructor(
     fun setUpdateChannel(beta: Boolean) {
         checker.betaChannel = beta
         _uiState.value = _uiState.value.copy(updateBeta = beta)
+    }
+
+    fun loadNetConfig() {
+        viewModelScope.launch {
+            repository.getNetConfig().onSuccess { cfg ->
+                _uiState.value = _uiState.value.copy(
+                    netStatic = cfg.useStatic,
+                    netIp = cfg.ip,
+                    netGw = cfg.gw,
+                    netMask = cfg.mask,
+                    netDns1 = cfg.dns1,
+                    netDns2 = cfg.dns2
+                )
+            }.onFailure { Timber.w(it, "Failed to load network config") }
+        }
+    }
+
+    fun setNetField(key: String, value: String) {
+        val st = _uiState.value
+        _uiState.value = when (key) {
+            "ip" -> st.copy(netIp = value)
+            "gw" -> st.copy(netGw = value)
+            "mask" -> st.copy(netMask = value)
+            "dns1" -> st.copy(netDns1 = value)
+            "dns2" -> st.copy(netDns2 = value)
+            else -> st
+        }
+    }
+
+    fun setNetStatic(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(netStatic = enabled)
+    }
+
+    fun saveNetConfig() {
+        val st = _uiState.value
+        viewModelScope.launch {
+            repository.setNetConfig(
+                com.example.androidplayer.data.ble.BlePlayerClient.NetConfig(
+                    st.netStatic, st.netIp, st.netGw, st.netMask, st.netDns1, st.netDns2
+                )
+            ).fold(
+                onSuccess = {
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = true,
+                        saveMessage = tr("Мережу збережено — застосується після перезавантаження")
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = false,
+                        saveMessage = error.message ?: "Failed to save network settings"
+                    )
+                }
+            )
+        }
     }
 
     fun loadAudioProfile() {
@@ -460,6 +516,12 @@ data class SettingsUiState(
     val updateIntervalHours: Int = 12,
     val updateBeta: Boolean = false,
     val audioProfile: Int = 1,
+    val netStatic: Boolean = false,
+    val netIp: String = "",
+    val netGw: String = "",
+    val netMask: String = "255.255.255.0",
+    val netDns1: String = "",
+    val netDns2: String = "",
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

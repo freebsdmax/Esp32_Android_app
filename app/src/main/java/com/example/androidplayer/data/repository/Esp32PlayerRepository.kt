@@ -500,6 +500,14 @@ class Esp32PlayerRepository @Inject constructor(
     // МОНИТОРИНГ
     // ========================================================================
     
+    suspend fun getNetConfig(): Result<BlePlayerClient.NetConfig> = safeApiCall {
+        bleClient.getNetConfig()
+    }
+
+    suspend fun setNetConfig(cfg: BlePlayerClient.NetConfig): Result<Boolean> = safeApiCall {
+        bleClient.setNetConfig(cfg)
+    }
+
     suspend fun getAudioProfile(): Result<Int> = safeApiCall {
         bleClient.getAudioProfile()
     }

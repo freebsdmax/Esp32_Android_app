@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Wifi
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.net.Uri
@@ -112,6 +113,19 @@ fun SettingsScreen(
             AppearanceCard(
                 darkTheme = uiState.darkTheme,
                 onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            NetCard(
+                useStatic = uiState.netStatic,
+                ip = uiState.netIp,
+                gw = uiState.netGw,
+                mask = uiState.netMask,
+                dns1 = uiState.netDns1,
+                dns2 = uiState.netDns2,
+                onStatic = { viewModel.setNetStatic(it) },
+                onField = { k, v -> viewModel.setNetField(k, v) },
+                onSave = { viewModel.saveNetConfig() }
             )
         }
         item {
@@ -913,6 +927,72 @@ private fun AudioProfileCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NetCard(
+    useStatic: Boolean,
+    ip: String,
+    gw: String,
+    mask: String,
+    dns1: String,
+    dns2: String,
+    onStatic: (Boolean) -> Unit,
+    onField: (String, String) -> Unit,
+    onSave: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.Wifi,
+                title = tr("Мережа (STA)"),
+                subtitle = tr("Статична IP і DNS")
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    tr("Статична IP"),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(checked = useStatic, onCheckedChange = onStatic)
+            }
+
+            if (useStatic) {
+                listOf(
+                    Triple("ip", tr("IP-адреса"), ip),
+                    Triple("gw", tr("Шлюз"), gw),
+                    Triple("mask", tr("Маска"), mask),
+                    Triple("dns1", tr("DNS 1"), dns1),
+                    Triple("dns2", tr("DNS 2"), dns2)
+                ).forEach { (key, label, value) ->
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = { onField(key, it) },
+                        label = { Text(label) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Text(
+                tr("Застосовується після перезавантаження плати"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Зберегти"))
+            }
         }
     }
 }

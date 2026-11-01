@@ -802,6 +802,41 @@ class BlePlayerClient(context: Context) {
         return JSONObject(rpc("audio.set", payload)).optInt("profile", profile)
     }
 
+    data class NetConfig(
+        val useStatic: Boolean = false,
+        val ip: String = "",
+        val gw: String = "",
+        val mask: String = "255.255.255.0",
+        val dns1: String = "",
+        val dns2: String = ""
+    )
+
+    suspend fun getNetConfig(): NetConfig {
+        val j = JSONObject(rpc("net.get"))
+        return NetConfig(
+            useStatic = j.optBoolean("static"),
+            ip = j.optString("ip"),
+            gw = j.optString("gw"),
+            mask = j.optString("mask", "255.255.255.0"),
+            dns1 = j.optString("dns1"),
+            dns2 = j.optString("dns2")
+        )
+    }
+
+    suspend fun setNetConfig(cfg: NetConfig): Boolean {
+        val payload = JSONObject()
+            .put("static", cfg.useStatic)
+            .put("ip", cfg.ip)
+            .put("gw", cfg.gw)
+            .put("mask", cfg.mask)
+            .put("dns1", cfg.dns1)
+            .put("dns2", cfg.dns2)
+            .toString()
+        val j = JSONObject(rpc("net.set", payload))
+        if (!j.optBoolean("success")) throw IllegalStateException("Network settings rejected")
+        return j.optBoolean("reboot_required", true)
+    }
+
     data class LogsConfig(val bufferKb: Int = 4, val persist: Boolean = true)
 
     suspend fun getLogsConfig(): LogsConfig {
