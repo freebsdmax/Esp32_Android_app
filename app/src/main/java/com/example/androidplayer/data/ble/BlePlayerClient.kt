@@ -794,6 +794,19 @@ class BlePlayerClient(context: Context) {
         return json.optBoolean("reboot_required", true)
     }
 
+    data class LogsConfig(val bufferKb: Int = 4, val persist: Boolean = true)
+
+    suspend fun getLogsConfig(): LogsConfig {
+        val json = JSONObject(rpc("logs.cfg"))
+        return LogsConfig(json.optInt("buf_kb", 4), json.optBoolean("persist", true))
+    }
+
+    suspend fun setLogsConfig(cfg: LogsConfig): LogsConfig {
+        val payload = JSONObject().put("buf_kb", cfg.bufferKb).put("persist", cfg.persist).toString()
+        val json = JSONObject(rpc("logs.set", payload))
+        return LogsConfig(json.optInt("buf_kb", cfg.bufferKb), json.optBoolean("persist", cfg.persist))
+    }
+
     data class AuthConfig(val enabled: Boolean = false, val token: String = "")
 
     suspend fun getAuth(): AuthConfig {

@@ -36,6 +36,7 @@ class SettingsViewModel @Inject constructor(
         loadCanConfig()
         loadAuthConfig()
         loadBleName()
+        loadLogsConfig()
     }
 
     /** Крок і метод перемотки зберігаються на платі (NVS Master + Slave). */
@@ -185,6 +186,49 @@ class SettingsViewModel @Inject constructor(
     /**
      * Сброс сообщения о сохранении
      */
+    fun loadLogsConfig() {
+        viewModelScope.launch {
+            repository.getLogsConfig().onSuccess { cfg ->
+                _uiState.value = _uiState.value.copy(
+                    logBufferKb = cfg.bufferKb,
+                    logPersist = cfg.persist
+                )
+            }.onFailure { Timber.w(it, "Failed to load logs config") }
+        }
+    }
+
+    fun setLogBufferKb(kb: Int) {
+        _uiState.value = _uiState.value.copy(logBufferKb = kb)
+    }
+
+    fun setLogPersist(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(logPersist = enabled)
+    }
+
+    fun saveLogsConfig() {
+        val st = _uiState.value
+        viewModelScope.launch {
+            repository.setLogsConfig(
+                com.example.androidplayer.data.ble.BlePlayerClient.LogsConfig(st.logBufferKb, st.logPersist)
+            ).fold(
+                onSuccess = { cfg ->
+                    _uiState.value = _uiState.value.copy(
+                        logBufferKb = cfg.bufferKb,
+                        logPersist = cfg.persist,
+                        isSaved = true,
+                        saveMessage = tr("Налаштування логів збережено (буфер — після перезавантаження)")
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaved = false,
+                        saveMessage = error.message ?: "Failed to save log settings"
+                    )
+                }
+            )
+        }
+    }
+
     fun loadBleName() {
         viewModelScope.launch {
             repository.getBleName().onSuccess { name ->
@@ -361,6 +405,8 @@ data class SettingsUiState(
     val webToken: String = "",
     val webTokenEnabled: Boolean = false,
     val bleName: String = "",
+    val logBufferKb: Int = 4,
+    val logPersist: Boolean = true,
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

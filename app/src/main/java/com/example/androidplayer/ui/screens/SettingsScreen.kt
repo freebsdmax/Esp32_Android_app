@@ -5,6 +5,7 @@ import com.example.androidplayer.ui.viewmodel.OtaViewModel
 import com.example.androidplayer.ui.viewmodel.OtaUiState
 import com.example.androidplayer.ui.components.CardHeader
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Lock
@@ -109,6 +110,15 @@ fun SettingsScreen(
             AppearanceCard(
                 darkTheme = uiState.darkTheme,
                 onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            LogsCard(
+                bufferKb = uiState.logBufferKb,
+                persist = uiState.logPersist,
+                onBuffer = { viewModel.setLogBufferKb(it) },
+                onPersist = { viewModel.setLogPersist(it) },
+                onSave = { viewModel.saveLogsConfig() }
             )
         }
         item {
@@ -712,6 +722,65 @@ private fun BleNameCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Зберегти"))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LogsCard(
+    bufferKb: Int,
+    persist: Boolean,
+    onBuffer: (Int) -> Unit,
+    onPersist: (Boolean) -> Unit,
+    onSave: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.Description,
+                title = tr("Логи"),
+                subtitle = tr("Буфер і збереження у /storage")
+            )
+
+            Text(tr("Розмір буфера"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(2, 4, 8, 16).forEach { kb ->
+                    FilterChip(
+                        selected = bufferKb == kb,
+                        onClick = { onBuffer(kb) },
+                        label = { Text("$kb КБ") }
+                    )
+                }
+            }
+            Text(
+                tr("Застосується після перезавантаження плати"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        tr("Чорна скринька"),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        tr("Дописувати логи у /storage/log.txt (ротація 256 КБ)"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = persist, onCheckedChange = onPersist)
+            }
+
             Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
                 Text(tr("Зберегти"))
             }
