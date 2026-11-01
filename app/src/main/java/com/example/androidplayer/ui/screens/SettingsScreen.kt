@@ -21,6 +21,8 @@ import com.example.androidplayer.ui.i18n.tr
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
@@ -541,7 +543,7 @@ private fun SavedBanner(message: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SeekCard(
     stepSeconds: Int,
@@ -564,7 +566,10 @@ private fun SeekCard(
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 listOf(5, 10, 15, 30).forEach { step ->
                     FilterChip(
                         selected = stepSeconds == step,
@@ -594,7 +599,7 @@ private fun SeekCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun CanCard(
     bitrate: Int,
@@ -628,7 +633,10 @@ private fun CanCard(
             )
 
             Text(tr("Швидкість"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 listOf(125, 250, 500).forEach { rate ->
                     FilterChip(
                         selected = bitrate == rate,
@@ -646,7 +654,10 @@ private fun CanCard(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedTextField(
                     value = mnText,
                     onValueChange = { mnText = it; parseHex(it)?.let { v -> onField("mask_next", v) } },
@@ -686,7 +697,7 @@ private fun CanCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AuthCard(
     token: String,
@@ -725,7 +736,7 @@ private fun AuthCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun BleNameCard(
     name: String,
@@ -761,7 +772,7 @@ private fun BleNameCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun LogsCard(
     bufferKb: Int,
@@ -782,7 +793,10 @@ private fun LogsCard(
             )
 
             Text(tr("Розмір буфера"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 listOf(2, 4, 8, 16).forEach { kb ->
                     FilterChip(
                         selected = bufferKb == kb,
@@ -820,7 +834,7 @@ private fun LogsCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun UpdatesAutoCard(
     auto: Boolean,
@@ -857,7 +871,10 @@ private fun UpdatesAutoCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                     listOf(6, 12, 24).forEach { h ->
                         FilterChip(
                             selected = intervalHours == h,
@@ -872,7 +889,10 @@ private fun UpdatesAutoCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                     FilterChip(
                         selected = !beta,
                         onClick = { onChannel(false) },
@@ -889,7 +909,7 @@ private fun UpdatesAutoCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AudioProfileCard(
     profile: Int,
@@ -905,7 +925,10 @@ private fun AudioProfileCard(
                 title = tr("Аудіо-буфери"),
                 subtitle = tr("Затримка проти стійкості до затинів")
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 FilterChip(
                     selected = profile == 0,
                     onClick = { onSelect(0) },
@@ -931,7 +954,7 @@ private fun AudioProfileCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun NetCard(
     useStatic: Boolean,
