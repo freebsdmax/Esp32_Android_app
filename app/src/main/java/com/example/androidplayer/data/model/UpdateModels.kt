@@ -14,6 +14,11 @@ data class ReleaseInfo(
     val notes: String,
     val assets: List<ReleaseAsset>
 ) {
+    /** Злитий образ для прошивки по кабелю (`-full.bin`). */
+    fun assembledImage(): ReleaseAsset? =
+        assets.firstOrNull { it.name.lowercase().contains("-full") && it.name.endsWith(".bin") }
+            ?: asset(listOf(".bin"), exclude = listOf("bootloader", "partition", "ota_data"))
+
     fun asset(extensions: List<String>, exclude: List<String> = emptyList()): ReleaseAsset? {
         val lower = extensions.map { it.lowercase() }
         val excl = exclude.map { it.lowercase() }

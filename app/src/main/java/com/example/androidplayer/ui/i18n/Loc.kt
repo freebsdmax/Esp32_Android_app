@@ -305,6 +305,43 @@ object Loc {
         if (isUkrainian) "Вимкнено: у режимі Bluetooth міні-плеєр ховається (звук іде з телефона)."
         else "Off: hidden in Bluetooth mode (audio comes from the phone)."
 
+
+    // ---- Прошивка по USB-кабелю ----
+    fun imageSaved(name: String): String =
+        if (isUkrainian) "Образ збережено у Завантаження: $name"
+        else "Image saved to Downloads: $name"
+
+    fun usbTitle(): String = if (isUkrainian) "Прошивка по кабелю" else "Firmware over cable"
+    fun usbSubtitle(): String =
+        if (isUkrainian) "Аварійне відновлення через USB" else "Emergency recovery over USB"
+    fun usbDownloading(): String = if (isUkrainian) "Завантаження образу…" else "Downloading image…"
+    fun usbDownloadingPercent(p: Int): String =
+        if (isUkrainian) "Завантаження образу: $p%" else "Downloading image: $p%"
+    fun usbImageReady(name: String, kb: Long): String =
+        if (isUkrainian) "Образ готовий: $name ($kb КБ)" else "Image ready: $name ($kb KB)"
+    fun usbFlashing(): String = if (isUkrainian) "Прошивання…" else "Flashing…"
+    fun usbDone(): String =
+        if (isUkrainian) "Прошито! Від'єднайте кабель, плата перезавантажується"
+        else "Flashed! Unplug the cable, the board is rebooting"
+    fun usbNoDevice(): String =
+        if (isUkrainian) "USB-пристрій не знайдено — підключіть кабель і натисніть «Оновити список»"
+        else "No USB device found — connect the cable and refresh the list"
+    fun usbNoImage(): String =
+        if (isUkrainian) "Спочатку завантажте образ" else "Download the image first"
+    fun usbPermissionDenied(): String =
+        if (isUkrainian) "Немає дозволу на USB-пристрій" else "USB permission denied"
+    fun usbUnsupported(): String =
+        if (isUkrainian) "Цей USB-пристрій не є послідовним портом (потрібен USB-UART/CDC)"
+        else "This USB device is not a serial port (USB-UART/CDC required)"
+    fun usbRefresh(): String = if (isUkrainian) "Оновити список" else "Refresh list"
+    fun usbDownloadImage(): String = if (isUkrainian) "Завантажити образ" else "Download image"
+    fun usbFlash(): String = if (isUkrainian) "Прошити" else "Flash"
+    fun usbNoDevices(): String =
+        if (isUkrainian) "Немає послідовних USB-пристроїв" else "No serial USB devices"
+    fun usbHint(): String =
+        if (isUkrainian) "Затисніть BOOT, натисніть RESET, потім «Прошити» — або увімкніть авто-reset"
+        else "Hold BOOT, tap RESET, then press Flash — or enable auto-reset"
+
     fun fwManualTitle(): String = if (isUkrainian) "Прошивка вручну" else "Manual firmware"
     fun fwManualSubtitle(): String =
         if (isUkrainian) "Файл .bin з телефона" else ".bin file from the phone"

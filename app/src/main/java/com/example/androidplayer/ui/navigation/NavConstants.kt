@@ -30,4 +30,5 @@ object NavRoutes {
     const val OTA = "/ota"
     const val SYSTEM_MONITOR = "/system_monitor"
     const val BLE_DISCOVERY = "/ble_discovery"
+    const val USB_FLASH = "/usb_flash"
 }

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.Wifi
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -54,6 +55,7 @@ import com.example.androidplayer.ui.notify.AppNotify
 fun SettingsScreen(
     ble: BlePlayerClient,
     onOpenBle: () -> Unit,
+    onOpenUsbFlash: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -204,6 +206,20 @@ fun SettingsScreen(
                 onTimeoutChange = { viewModel.setSleepTimeoutSeconds(it) },
                 onSave = { viewModel.saveSleepSettings() }
             )
+        }
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionHeader(
+                        icon = Icons.Default.Usb,
+                        title = Loc.usbTitle(),
+                        subtitle = Loc.usbSubtitle()
+                    )
+                    Button(onClick = onOpenUsbFlash, modifier = Modifier.fillMaxWidth()) {
+                        Text(tr("Відкрити"))
+                    }
+                }
+            }
         }
         item {
             ManualFirmwareCard(

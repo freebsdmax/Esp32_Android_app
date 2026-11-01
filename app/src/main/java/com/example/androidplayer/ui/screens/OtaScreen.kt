@@ -63,6 +63,32 @@ fun OtaScreen(
                 )
             }
 
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = tr("Прошивка по кабелю"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = tr("Зберегти злитий образ у Завантаження (для відновлення по USB)"),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Button(
+                            onClick = { updateViewModel.saveFirmwareImage() },
+                            enabled = !updateState.busy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(tr("Зберегти образ"))
+                        }
+                    }
+                }
+            }
+
             // Информация о версиях
             item {
                 VersionInfoSection(uiState = uiState)

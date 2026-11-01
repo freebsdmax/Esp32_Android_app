@@ -63,6 +63,7 @@ fun MainNavigation() {
         currentDestination?.hierarchy?.any { it.route == item.route } == true
     }?.title ?: when (currentDestination?.route) {
         NavRoutes.SETTINGS -> tr("Налаштування")
+        NavRoutes.USB_FLASH -> tr("Прошивка по кабелю")
         NavRoutes.BLE_DISCOVERY -> tr("BLE пристрої")
         else -> tr("Ford Player")
     }
@@ -161,10 +162,12 @@ fun MainNavigation() {
             composable(NavRoutes.SETTINGS) {
                 SettingsScreen(
                     ble = ble,
-                    onOpenBle = { navController.navigate(NavRoutes.BLE_DISCOVERY) { launchSingleTop = true } }
+                    onOpenBle = { navController.navigate(NavRoutes.BLE_DISCOVERY) { launchSingleTop = true } },
+            onOpenUsbFlash = { navController.navigate(NavRoutes.USB_FLASH) { launchSingleTop = true } }
                 )
             }
-            composable(NavRoutes.BLE_DISCOVERY) {
+            composable(NavRoutes.USB_FLASH) { UsbFlashScreen() }
+        composable(NavRoutes.BLE_DISCOVERY) {
                 BleDiscoveryScreen(
                     onDeviceSelected = { },
                     onNavigateBack = { navController.popBackStack() }

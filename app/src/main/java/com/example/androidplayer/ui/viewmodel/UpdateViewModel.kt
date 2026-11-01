@@ -1,7 +1,11 @@
 package com.example.androidplayer.ui.viewmodel
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,7 +24,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -240,6 +246,67 @@ class UpdateViewModel @Inject constructor(
             }
         if (_uiState.value.busy) return
         installer.flash(asset, "slave")
+    }
+
+    /**
+     * Зберігає злитий образ (`-full.bin`) у «Завантаження» телефону —
+     * щоб прошити плату по кабелю (з ПК або з екрана «Прошивка по кабелю»).
+     */
+    fun saveFirmwareImage() {
+        val release = fwRelease ?: return
+        val asset = release.assembledImage()
+            ?: run {
+                _uiState.value = _uiState.value.copy(error = Loc.updateErrorNoBin())
+                return
+            }
+        if (_uiState.value.busy) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                busy = true, progress = 0, error = null,
+                status = Loc.updateDownloading(asset.name)
+            )
+            try {
+                val file = File(context.cacheDir, "updates/${asset.name}")
+                github.download(asset.url, file) { p ->
+                    _uiState.value = _uiState.value.copy(progress = p)
+                }
+                val saved = withContext(Dispatchers.IO) { saveToDownloads(file, asset.name) }
+                _uiState.value = _uiState.value.copy(
+                    busy = false, progress = 100,
+                    status = Loc.imageSaved(asset.name)
+                )
+                Timber.d("Firmware image saved: %s", saved)
+            } catch (e: Exception) {
+                Timber.e(e, "Saving image failed")
+                _uiState.value = _uiState.value.copy(
+                    busy = false, error = Loc.updateErrorDownload(e.message ?: "unknown")
+                )
+            }
+        }
+    }
+
+    private fun saveToDownloads(file: File, name: String): String {
+        val resolver = context.contentResolver
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, name)
+                put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("MediaStore rejected the file")
+            resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }
+                ?: throw IllegalStateException("Cannot open output stream")
+            return uri.toString()
+        }
+
+        @Suppress("DEPRECATION")
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        dir.mkdirs()
+        val dst = File(dir, name)
+        file.copyTo(dst, overwrite = true)
+        return dst.absolutePath
     }
 
     fun clearMessages() {
