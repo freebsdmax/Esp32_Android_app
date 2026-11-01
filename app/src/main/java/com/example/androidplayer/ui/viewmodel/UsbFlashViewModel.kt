@@ -42,6 +42,8 @@ class UsbFlashViewModel @Inject constructor(
     data class DeviceInfo(val name: String, val vendorId: Int, val productId: Int, val deviceId: Int)
 
     data class UiState(
+        /** "master" або "slave" — яку прошивку заливаємо */
+        val target: String = "master",
         val devices: List<DeviceInfo> = emptyList(),
         val selected: DeviceInfo? = null,
         val imageName: String? = null,
@@ -106,6 +108,21 @@ class UsbFlashViewModel @Inject constructor(
         )
     }
 
+    /** Вибір плати: Master або Slave (у кожної свій репозиторій з образами). */
+    fun setTarget(target: String) {
+        if (_uiState.value.busy || target == _uiState.value.target) return
+        _uiState.value = _uiState.value.copy(
+            target = target,
+            imageName = null,
+            imageSize = 0,
+            imageTag = null,
+            progress = 0,
+            status = null,
+            error = null,
+            log = emptyList()
+        )
+    }
+
     fun select(item: DeviceInfo) {
         _uiState.value = _uiState.value.copy(selected = item, error = null)
     }
@@ -140,7 +157,8 @@ class UsbFlashViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(busy = true, progress = 0, error = null,
                 status = Loc.usbDownloading())
             try {
-                val release = github.latestRelease(FW_REPO) ?: throw IllegalStateException("GitHub unavailable")
+                val repo = if (_uiState.value.target == "slave") SLAVE_REPO else FW_REPO
+                val release = github.latestRelease(repo) ?: throw IllegalStateException("GitHub unavailable")
                 val asset = release.asset(listOf(".bin"), exclude = listOf("bootloader", "partition", "ota_data"))
                     ?: release.asset(listOf("-full.bin"))
                     ?: throw IllegalStateException("Release has no -full.bin")
@@ -242,5 +260,6 @@ class UsbFlashViewModel @Inject constructor(
 
     companion object {
         const val FW_REPO = "freebsdmax/Ford-DensO-mp3-master"
+        const val SLAVE_REPO = "freebsdmax/Ford-DensO-bluetooth-slave"
     }
 }

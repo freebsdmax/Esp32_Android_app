@@ -21,6 +21,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -44,6 +45,7 @@ import com.example.androidplayer.ui.viewmodel.UsbFlashViewModel
 /**
  * Аварійна прошивка плати по USB-кабелю з телефона.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun UsbFlashScreen(
     viewModel: UsbFlashViewModel = hiltViewModel()
@@ -125,6 +127,22 @@ fun UsbFlashScreen(
         item {
             ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(Loc.usbTargetTitle(), style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold)
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = state.target == "master",
+                            onClick = { viewModel.setTarget("master") },
+                            label = { Text(Loc.usbTargetMaster()) }
+                        )
+                        FilterChip(
+                            selected = state.target == "slave",
+                            onClick = { viewModel.setTarget("slave") },
+                            label = { Text(Loc.usbTargetSlave()) }
+                        )
+                    }
+
                     Text(tr("Образ прошивки"), style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold)
 
