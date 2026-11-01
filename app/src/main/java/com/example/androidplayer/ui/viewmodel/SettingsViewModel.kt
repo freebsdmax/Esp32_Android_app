@@ -21,7 +21,8 @@ import timber.log.Timber
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val repository: Esp32PlayerRepository
+    private val repository: Esp32PlayerRepository,
+    private val checker: com.example.androidplayer.data.update.UpdateChecker
 ) : ViewModel() {
     
     private val prefs = context.getSharedPreferences("esp32_player_prefs", Context.MODE_PRIVATE)
@@ -136,7 +137,10 @@ class SettingsViewModel @Inject constructor(
             autoReconnect = autoReconnect,
             showNotifications = showNotifications,
             darkTheme = darkTheme,
-            miniPlayerAlways = miniPlayerAlways
+            miniPlayerAlways = miniPlayerAlways,
+            updateAuto = checker.autoEnabled,
+            updateIntervalHours = checker.intervalHours,
+            updateBeta = checker.betaChannel
         )
     }
     
@@ -186,6 +190,21 @@ class SettingsViewModel @Inject constructor(
     /**
      * Сброс сообщения о сохранении
      */
+    fun setUpdateAuto(enabled: Boolean) {
+        checker.autoEnabled = enabled
+        _uiState.value = _uiState.value.copy(updateAuto = enabled)
+    }
+
+    fun setUpdateInterval(hours: Int) {
+        checker.intervalHours = hours
+        _uiState.value = _uiState.value.copy(updateIntervalHours = hours)
+    }
+
+    fun setUpdateChannel(beta: Boolean) {
+        checker.betaChannel = beta
+        _uiState.value = _uiState.value.copy(updateBeta = beta)
+    }
+
     fun loadLogsConfig() {
         viewModelScope.launch {
             repository.getLogsConfig().onSuccess { cfg ->
@@ -407,6 +426,9 @@ data class SettingsUiState(
     val bleName: String = "",
     val logBufferKb: Int = 4,
     val logPersist: Boolean = true,
+    val updateAuto: Boolean = true,
+    val updateIntervalHours: Int = 12,
+    val updateBeta: Boolean = false,
     val sleepMode: Int = 0,
     val sleepTimeoutSec: Int = 30,
     val isSaved: Boolean = false,

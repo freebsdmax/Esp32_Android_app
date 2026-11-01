@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -110,6 +111,16 @@ fun SettingsScreen(
             AppearanceCard(
                 darkTheme = uiState.darkTheme,
                 onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+            )
+        }
+        item {
+            UpdatesAutoCard(
+                auto = uiState.updateAuto,
+                intervalHours = uiState.updateIntervalHours,
+                beta = uiState.updateBeta,
+                onAuto = { viewModel.setUpdateAuto(it) },
+                onInterval = { viewModel.setUpdateInterval(it) },
+                onChannel = { viewModel.setUpdateChannel(it) }
             )
         }
         item {
@@ -783,6 +794,75 @@ private fun LogsCard(
 
             Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
                 Text(tr("Зберегти"))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UpdatesAutoCard(
+    auto: Boolean,
+    intervalHours: Int,
+    beta: Boolean,
+    onAuto: (Boolean) -> Unit,
+    onInterval: (Int) -> Unit,
+    onChannel: (Boolean) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.SystemUpdate,
+                title = Loc.updAutoTitle(),
+                subtitle = Loc.updAutoSubtitle()
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    Loc.updAutoSwitch(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(checked = auto, onCheckedChange = onAuto)
+            }
+
+            if (auto) {
+                Text(
+                    Loc.updInterval(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(6, 12, 24).forEach { h ->
+                        FilterChip(
+                            selected = intervalHours == h,
+                            onClick = { onInterval(h) },
+                            label = { Text("$h год") }
+                        )
+                    }
+                }
+
+                Text(
+                    Loc.updChannel(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = !beta,
+                        onClick = { onChannel(false) },
+                        label = { Text(tr("Стабільний")) }
+                    )
+                    FilterChip(
+                        selected = beta,
+                        onClick = { onChannel(true) },
+                        label = { Text(tr("Бета")) }
+                    )
+                }
             }
         }
     }

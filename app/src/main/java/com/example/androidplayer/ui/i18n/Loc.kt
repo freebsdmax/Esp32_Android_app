@@ -268,6 +268,15 @@ object Loc {
     fun updFlash(): String = if (isUkrainian) "Завантажити і прошити" else "Download & flash"
     fun updUpToDate(): String = if (isUkrainian) "Актуально" else "Up to date"
     fun updNoConnection(): String = if (isUkrainian) "Немає з'єднання" else "Not connected"
+    fun updateAvailableText(what: String): String =
+        if (isUkrainian) "Доступне оновлення — $what"
+        else "Update available — $what"
+    fun updAutoTitle(): String = if (isUkrainian) "Оновлення" else "Updates"
+    fun updAutoSubtitle(): String = if (isUkrainian) "Фонова перевірка" else "Background check"
+    fun updAutoSwitch(): String = if (isUkrainian) "Перевіряти автоматично" else "Check automatically"
+    fun updInterval(): String = if (isUkrainian) "Інтервал" else "Interval"
+    fun updChannel(): String = if (isUkrainian) "Канал" else "Channel"
+
     fun updChecking(): String = if (isUkrainian) "Перевірка…" else "Checking…"
     fun updNewAvailable(): String = if (isUkrainian) "Доступне оновлення" else "Update available"
     fun updateErrorCheck(): String =

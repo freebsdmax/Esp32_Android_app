@@ -31,6 +31,7 @@ class UpdateViewModel @Inject constructor(
     private val repository: Esp32PlayerRepository,
     private val bleClient: com.example.androidplayer.data.ble.BlePlayerClient,
     private val installer: UpdateInstaller,
+    private val checker: com.example.androidplayer.data.update.UpdateChecker,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -93,9 +94,10 @@ class UpdateViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(checking = true, error = null, status = null)
 
             val maxAge = if (force) 0L else GitHubReleaseClient.CACHE_TTL_MS
-            val app = github.latestRelease(APP_REPO, maxAge)
-            val fw = github.latestRelease(FW_REPO, maxAge)
-            val slave = github.latestRelease(SLAVE_REPO, maxAge)
+            val beta = checker.betaChannel
+            val app = github.latestRelease(APP_REPO, maxAge, beta)
+            val fw = github.latestRelease(FW_REPO, maxAge, beta)
+            val slave = github.latestRelease(SLAVE_REPO, maxAge, beta)
             appRelease = app
             fwRelease = fw
             slaveRelease = slave

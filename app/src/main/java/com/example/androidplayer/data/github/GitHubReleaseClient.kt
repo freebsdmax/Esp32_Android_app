@@ -52,7 +52,8 @@ class GitHubReleaseClient @Inject constructor(
 
     suspend fun latestRelease(
         repo: String,
-        maxAgeMs: Long = CACHE_TTL_MS
+        maxAgeMs: Long = CACHE_TTL_MS,
+        includePrereleases: Boolean = false
     ): ReleaseInfo? = withContext(Dispatchers.IO) {
         val cached = readCache(repo)
         val cachedAt = prefs.getLong(keyTime(repo), 0L)
@@ -61,8 +62,14 @@ class GitHubReleaseClient @Inject constructor(
             return@withContext cached
         }
 
+        val url = if (includePrereleases) {
+            // бета-канал: беремо найсвіжіший реліз, навіть якщо це prerelease
+            "https://api.github.com/repos/$repo/releases?per_page=1"
+        } else {
+            "https://api.github.com/repos/$repo/releases/latest"
+        }
         val builder = Request.Builder()
-            .url("https://api.github.com/repos/$repo/releases/latest")
+            .url(url)
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", "Ford-Player-Android")
         prefs.getString(keyEtag(repo), null)?.let { builder.header("If-None-Match", it) }
@@ -77,7 +84,13 @@ class GitHubReleaseClient @Inject constructor(
                         return@withContext cached
                     }
                     response.isSuccessful -> {
-                        val body = response.body?.string() ?: return@withContext cached
+                        var body = response.body?.string() ?: return@withContext cached
+                        if (includePrereleases) {
+                            // масив релізів -> беремо перший об'єкт
+                            val arr = org.json.JSONArray(body)
+                            if (arr.length() == 0) return@withContext cached
+                            body = arr.getJSONObject(0).toString()
+                        }
                         val parsed = parse(repo, body) ?: return@withContext cached
                         val etag = response.header("ETag")
                         prefs.edit()
@@ -156,6 +169,7 @@ class GitHubReleaseClient @Inject constructor(
     }
 
     private fun keyBody(repo: String) = "body_$repo"
+    private fun keyBodyBeta(repo: String) = "body_beta_$repo"
     private fun keyEtag(repo: String) = "etag_$repo"
     private fun keyTime(repo: String) = "ts_$repo"
 
