@@ -354,8 +354,12 @@ object Loc {
     fun usbNoDevices(): String =
         if (isUkrainian) "Немає послідовних USB-пристроїв" else "No serial USB devices"
     fun usbHint(): String =
-        if (isUkrainian) "Затисніть BOOT, натисніть RESET, потім «Прошити» — або увімкніть авто-reset"
-        else "Hold BOOT, tap RESET, then press Flash — or enable auto-reset"
+        if (isUkrainian)
+            "Авто-скидання (DTR/RTS) вмикає режим завантажувача саме — кнопки не потрібні. " +
+                "BOOT+RESET — лише якщо плата не має схеми авто-скидання"
+        else
+            "Auto-reset (DTR/RTS) enters download mode by itself — no buttons needed. " +
+                "BOOT+RESET only if the board has no auto-reset circuit"
 
     fun fwManualTitle(): String = if (isUkrainian) "Прошивка вручну" else "Manual firmware"
     fun fwManualSubtitle(): String =

@@ -296,7 +296,7 @@ class UsbFlashViewModel @Inject constructor(
             }
 
             try {
-                withContext(Dispatchers.IO) { flasher.open(autoReset = true) }
+                withContext(Dispatchers.IO) { flasher.open() }
                 val bytes = withContext(Dispatchers.IO) { file.readBytes() }
                 when (val res = flasher.flash(bytes, 0, listener)) {
                     is EspFlasher.Result.Ok -> {

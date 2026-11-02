@@ -51,25 +51,86 @@ class EspFlasher(
     private val rx = ByteArrayOutputStream()
     private val noise = ByteArrayOutputStream()
 
-    /** Відкриває порт і переводить чіп у режим завантажувача. */
-    fun open(baud: Int = 115200, autoReset: Boolean = true) {
+    /** Відкриває порт. Скидання в режим завантажувача робить [flash]. */
+    fun open(baud: Int = 115200) {
         port.open(usbManager.openDevice(port.device))
         port.setParameters(baud, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+        runCatching {
+            port.dtr = false
+            port.rts = false
+        }
+        Thread.sleep(150)
+        runCatching { port.purgeHwBuffers(true, true) }
+    }
+
+    /**
+     * esptool-сумісне авто-скидання: DTR → IO0, RTS → EN
+     * (два транзистори на більшості плат з USB-UART: CH340/CP210x/FTDI).
+     */
+    private fun classicReset() {
+        port.dtr = false          // IO0 = HIGH
+        port.rts = true           // EN = LOW, чіп у скиданні
+        Thread.sleep(120)
+        port.dtr = true           // IO0 = LOW
+        port.rts = false          // EN = HIGH → старт у download mode
+        Thread.sleep(60)
+        port.dtr = false          // IO0 = HIGH
+    }
+
+    /** Скидання для вбудованого USB-Serial/JTAG (ESP32-S3/C3 без окремого моста). */
+    private fun usbJtagReset() {
+        port.rts = false
+        port.dtr = false          // idle
+        Thread.sleep(100)
+        port.dtr = true           // тримаємо IO0
+        port.rts = false
+        Thread.sleep(100)
+        port.rts = true           // reset
+        port.dtr = false
+        port.rts = true
+        Thread.sleep(100)
         port.dtr = false
         port.rts = false
-        if (autoReset) {
-            runCatching {
-                port.rts = true          // EN = 0 (reset)
-                port.dtr = true          // IO0 = 0 (boot)
+        Thread.sleep(60)
+    }
+
+    /** Та сама класична схема, але з переставленими лініями (DTR → EN, RTS → IO0). */
+    private fun classicSwappedReset() {
+        port.rts = false          // IO0 = HIGH
+        port.dtr = true           // EN = LOW
+        Thread.sleep(120)
+        port.rts = true           // IO0 = LOW
+        port.dtr = false          // EN = HIGH → download mode
+        Thread.sleep(60)
+        port.rts = false          // IO0 = HIGH
+    }
+
+    /**
+     * Пробує обидві схеми скидання (класичну і USB-JTAG), по два кола.
+     * Після кожного скидання — короткий SYNC; якщо чіп відповів, він уже
+     * в режимі завантажувача і кнопку BOOT натискати не треба.
+     */
+    private suspend fun enterBootloader(listener: Listener): Boolean {
+        // Плата могла вже бути в режимі завантажувача (після BOOT+RESET).
+        if (runCatching { sync(listener, tries = 1, timeoutMs = 800) }.getOrDefault(false)) return true
+
+        val strategies: List<Pair<String, () -> Unit>> = listOf(
+            "classic" to ::classicReset,
+            "classic-swapped" to ::classicSwappedReset,
+            "usb-jtag" to ::usbJtagReset
+        )
+        for (round in 1..2) {
+            for ((name, reset) in strategies) {
+                listener.onLog("Авто-скидання ($name), спроба $round…")
+                runCatching { reset() }
                 Thread.sleep(120)
-                port.rts = false
-                Thread.sleep(100)
-                port.dtr = false
-                Thread.sleep(100)
+                runCatching { port.purgeHwBuffers(true, true) }
+                val ok = runCatching { sync(listener, tries = 3, timeoutMs = 1200) }
+                    .getOrDefault(false)
+                if (ok) return true
             }
         }
-        Thread.sleep(200)
-        port.purgeHwBuffers(true, true)
+        return false
     }
 
     fun close() {
@@ -77,17 +138,21 @@ class EspFlasher(
     }
 
     /** Синхронізація з ROM bootloader. */
-    suspend fun sync(listener: Listener): Boolean = withContext(Dispatchers.IO) {
-        repeat(7) { attempt ->
+    suspend fun sync(
+        listener: Listener,
+        tries: Int = 7,
+        timeoutMs: Int = TIMEOUT_MS
+    ): Boolean = withContext(Dispatchers.IO) {
+        repeat(tries) { attempt ->
             rx.reset()
             val payload = byteArrayOf(0x07, 0x07, 0x12, 0x20)
             writePacket(OP_SYNC, payload, 0)
-            val resp = readResponse(TIMEOUT_MS)
+            val resp = readResponse(timeoutMs)
             if (resp != null && resp.status == 0) {
                 listener.onLog("SYNC ok (спроба ${attempt + 1})")
                 return@withContext true
             }
-            listener.onLog("SYNC ${attempt + 1}/7 — немає відповіді")
+            listener.onLog("SYNC ${attempt + 1}/$tries — немає відповіді")
             delay(150)
         }
         false
@@ -100,9 +165,10 @@ class EspFlasher(
         listener: Listener
     ): Result = withContext(Dispatchers.IO) {
         try {
-            if (!sync(listener)) {
+            if (!enterBootloader(listener)) {
                 return@withContext Result.Error(
-                    "Чіп не відповідає. Затисніть BOOT, натисніть RESET і спробуйте ще раз."
+                    "Чіп не вийшов у режим завантажувача автоматично. " +
+                        "Затисніть BOOT, натисніть RESET і спробуйте ще раз."
                 )
             }
 

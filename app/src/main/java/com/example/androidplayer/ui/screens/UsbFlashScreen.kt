@@ -74,7 +74,7 @@ fun UsbFlashScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        tr("Потрібен USB-OTG перехідник. Плата має бути в режимі завантажувача (BOOT + RESET)."),
+                        tr("Потрібен USB-OTG перехідник. Плата скидається в режим завантажувача автоматично."),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
