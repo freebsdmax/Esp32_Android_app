@@ -1133,6 +1133,25 @@ class BlePlayerClient(context: Context) {
     /** How many bytes of a command the device can really receive (0 = unknown). */
     fun commandCapacity(): Int = observedCommandBytes
 
+    /**
+     * Просить короткий інтервал з'єднання перед OTA. Android у фоні (екран
+     * вимкнений, застосунок у шторці) перемикає лінк на low-power з інтервалом
+     * 100+ мс — саме через це швидкість падає з ~20 КБ/с до ~4 КБ/с.
+     */
+    @SuppressLint("MissingPermission")
+    fun requestHighThroughput() {
+        runCatching {
+            bluetoothGatt?.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+        }.onFailure { Timber.w(it, "requestConnectionPriority(HIGH) failed") }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun restoreBalancedThroughput() {
+        runCatching {
+            bluetoothGatt?.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_BALANCED)
+        }
+    }
+
     fun resetCommandCapacity() {
         observedCommandBytes = 0
     }
@@ -1353,7 +1372,9 @@ class BlePlayerClient(context: Context) {
         frame[7] = ((data.size ushr 8) and 0xFF).toByte()
         System.arraycopy(data, 0, frame, 8, data.size)
 
-        val limit = maxCommandBytes()
+        // Бінарні кадри не проходять через JSON, тому ліміт — чистий ATT-розмір
+        // (observedCommandBytes стосується лише base64-команд).
+        val limit = (negotiatedMtu - 3).coerceAtLeast(20)
         if (frame.size > limit) {
             throw IllegalStateException(
                 "OTA frame of ${frame.size} B does not fit into $limit B (mtu=$negotiatedMtu)"

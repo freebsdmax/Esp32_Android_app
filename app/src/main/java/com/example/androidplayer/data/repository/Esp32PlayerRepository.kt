@@ -356,6 +356,9 @@ class Esp32PlayerRepository @Inject constructor(
     ): Result<Unit> = safeApiCall {
         if (!otaMutex.tryLock()) throw IllegalStateException("An update is already in progress")
         bleClient.setOtaSessionActive(true)
+        // Короткий інтервал з'єднання: інакше у фоні/зі згаслим екраном
+        // Android тримає low-power інтервал і швидкість падає в кілька разів.
+        bleClient.requestHighThroughput()
         try {
             val mtu = bleClient.ensureMtu()
             if (mtu < 100) throw IllegalStateException("BLE MTU too small ($mtu). Reconnect and retry.")
@@ -441,7 +444,9 @@ class Esp32PlayerRepository @Inject constructor(
 
                     // Binary frames, Write Without Response: no RPC round trip per chunk.
                     while (offset < firmware.size) {
-                        val frameData = (bleClient.maxCommandBytes() - 8).coerceIn(16, 480)
+                        // ATT payload мінус 8 байт заголовка кадру; НЕ обмежуємо
+                        // через observedCommandBytes (це евристика для JSON-команд).
+                        val frameData = (bleClient.currentMtu() - 3 - 8).coerceIn(16, 480)
                         val end = minOf(offset + frameData, firmware.size)
                         try {
                             bleClient.otaSendFrame(offset, firmware.copyOfRange(offset, end))
@@ -493,7 +498,8 @@ class Esp32PlayerRepository @Inject constructor(
                 if (storeName != null) {
                     // The device writes the image into /storage in the background;
                     // wait until it reports DONE before asking to flash it.
-                    emit("apply", 0, total, 91, uploadMeter)
+                    val storeMeter = RateTracker()
+                    emit("apply", 0, total, 91, storeMeter)
                     var storeWait = 0
                     while (storeWait++ < 240) {
                         val st = bleClient.fileOtaStatus()
@@ -549,6 +555,7 @@ class Esp32PlayerRepository @Inject constructor(
             }
         } finally {
             bleClient.setOtaSessionActive(false)
+            bleClient.restoreBalancedThroughput()
             otaMutex.unlock()
         }
     }
