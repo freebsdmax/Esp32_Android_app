@@ -20,11 +20,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -46,6 +48,8 @@ class UsbFlashViewModel @Inject constructor(
         val target: String = "master",
         val devices: List<DeviceInfo> = emptyList(),
         val selected: DeviceInfo? = null,
+        /** Чи надано Android-дозвіл на доступ до вибраного USB-пристрою */
+        val permission: Boolean = false,
         val imageName: String? = null,
         val imageSize: Long = 0,
         val imageTag: String? = null,
@@ -67,9 +71,13 @@ class UsbFlashViewModel @Inject constructor(
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             if (intent?.action != permissionAction) return
-            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+            val extra = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+            // Android 12+ may drop the extra from an immutable PendingIntent,
+            // so ask the system directly instead of trusting the broadcast.
+            val granted = extra || pendingDevice?.let { usbManager.hasPermission(it) } == true
             permission?.complete(granted)
             permission = null
+            _uiState.value = _uiState.value.copy(permission = granted)
         }
     }
 
@@ -102,9 +110,13 @@ class UsbFlashViewModel @Inject constructor(
                 deviceId = dev.deviceId
             )
         }
+        val selected = _uiState.value.selected ?: list.firstOrNull()
         _uiState.value = _uiState.value.copy(
             devices = list,
-            selected = _uiState.value.selected ?: list.firstOrNull()
+            selected = selected,
+            permission = selected?.let { info ->
+                findDevice(info)?.let { usbManager.hasPermission(it) }
+            } ?: false
         )
     }
 
@@ -124,30 +136,81 @@ class UsbFlashViewModel @Inject constructor(
     }
 
     fun select(item: DeviceInfo) {
-        _uiState.value = _uiState.value.copy(selected = item, error = null)
+        val dev = findDevice(item)
+        _uiState.value = _uiState.value.copy(
+            selected = item,
+            error = null,
+            permission = dev != null && usbManager.hasPermission(dev)
+        )
     }
 
     private fun findDevice(info: DeviceInfo): UsbDevice? =
         usbManager.deviceList.values.firstOrNull { it.deviceId == info.deviceId }
 
-    private suspend fun ensurePermission(device: UsbDevice): Boolean {
-        if (usbManager.hasPermission(device)) return true
-
+    /** Asks the system for one USB permission dialog; null = no answer in time. */
+    private suspend fun requestOnce(device: UsbDevice, timeoutMs: Long): Boolean? {
         val deferred = CompletableDeferred<Boolean>()
         permission = deferred
         pendingDevice = device
-
+        // FLAG_MUTABLE: the system fills EXTRA_PERMISSION_GRANTED into the
+        // intent. With FLAG_IMMUTABLE the extra can be lost on Android 12+,
+        // which looked like "the user denied" while the dialog was accepted.
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
         val intent = Intent(permissionAction).setPackage(context.packageName)
-        try {
+        return try {
             usbManager.requestPermission(device, PendingIntent.getBroadcast(context, 0, intent, flags))
+            withTimeoutOrNull(timeoutMs) { deferred.await() }
         } catch (e: Exception) {
             Timber.e(e, "requestPermission failed")
+            null
+        } finally {
             permission = null
+        }
+    }
+
+    private suspend fun ensurePermission(device: UsbDevice): Boolean {
+        if (usbManager.hasPermission(device)) {
+            _uiState.value = _uiState.value.copy(permission = true)
+            return true
+        }
+
+        val first = requestOnce(device, 45_000)
+        if (first == true || usbManager.hasPermission(device)) {
+            _uiState.value = _uiState.value.copy(permission = true)
+            return true
+        }
+        if (first == false) {
+            _uiState.value = _uiState.value.copy(permission = false)
             return false
         }
-        return deferred.await()
+
+        // No broadcast arrived (some OEM ROMs drop it) — one more attempt.
+        requestOnce(device, 20_000)
+        val granted = usbManager.hasPermission(device)
+        _uiState.value = _uiState.value.copy(permission = granted)
+        return granted
+    }
+
+    /** Explicit "Allow USB access" button: shows the system dialog on demand. */
+    fun requestPermission() {
+        val info = _uiState.value.selected
+        if (info == null) {
+            _uiState.value = _uiState.value.copy(error = Loc.usbNoDevice())
+            return
+        }
+        viewModelScope.launch {
+            val device = findDevice(info) ?: run {
+                _uiState.value = _uiState.value.copy(error = Loc.usbNoDevice())
+                return@launch
+            }
+            val granted = ensurePermission(device)
+            _uiState.value = _uiState.value.copy(
+                permission = granted,
+                error = if (granted) null else Loc.usbPermissionDenied(),
+                status = if (granted) Loc.usbPermissionGranted() else _uiState.value.status
+            )
+        }
     }
 
     /** Завантажує злитий образ (`-full.bin`) останнього релізу Master. */

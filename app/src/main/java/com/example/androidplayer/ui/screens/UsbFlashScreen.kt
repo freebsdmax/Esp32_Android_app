@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material3.Card
@@ -115,6 +116,23 @@ fun UsbFlashScreen(
                                     .padding(10.dp)
                             )
                         }
+                    }
+
+                    Text(
+                        if (state.permission) Loc.usbPermissionGranted() else Loc.usbPermissionNeeded(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state.permission) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error
+                    )
+
+                    OutlinedButton(
+                        onClick = { viewModel.requestPermission() },
+                        enabled = !state.busy && state.selected != null,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(Loc.usbGrantPermission())
                     }
 
                     OutlinedButton(

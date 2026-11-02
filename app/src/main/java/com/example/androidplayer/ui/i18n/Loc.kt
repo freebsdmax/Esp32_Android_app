@@ -333,7 +333,18 @@ object Loc {
     fun usbNoImage(): String =
         if (isUkrainian) "Спочатку завантажте образ" else "Download the image first"
     fun usbPermissionDenied(): String =
-        if (isUkrainian) "Немає дозволу на USB-пристрій" else "USB permission denied"
+        if (isUkrainian)
+            "Дозвіл на USB не надано. Натисніть «Дати дозвіл USB» і виберіть «Дозволити» " +
+                "(якщо вікна немає — перепідключіть кабель)"
+        else
+            "USB access was not granted. Tap \"Allow USB access\" and choose \"Allow\" " +
+                "(if no dialog appears, reconnect the cable)"
+    fun usbPermissionGranted(): String =
+        if (isUkrainian) "Дозвіл на USB надано" else "USB access granted"
+    fun usbPermissionNeeded(): String =
+        if (isUkrainian) "Дозвіл на USB ще не надано" else "USB access is not granted yet"
+    fun usbGrantPermission(): String =
+        if (isUkrainian) "Дати дозвіл USB" else "Allow USB access"
     fun usbUnsupported(): String =
         if (isUkrainian) "Цей USB-пристрій не є послідовним портом (потрібен USB-UART/CDC)"
         else "This USB device is not a serial port (USB-UART/CDC required)"
