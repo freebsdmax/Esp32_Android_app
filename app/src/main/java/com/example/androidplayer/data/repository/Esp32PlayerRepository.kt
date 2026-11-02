@@ -293,6 +293,53 @@ class Esp32PlayerRepository @Inject constructor(
 
 
     /**
+     * One-time bridge for boards that still run firmware older than v1.0.28.
+     *
+     * Their `file.begin` refuses images above 2 MB, while the legacy `ota.*`
+     * channel writes straight into the inactive OTA slot and is limited only by
+     * the slot size (3 MB). Slower than `file.*` (base64 RPC per chunk), but it
+     * needs no cable and the image is installed exactly once.
+     */
+    private suspend fun legacyMasterOta(
+        firmware: ByteArray,
+        emit: (phase: String, done: Long, totalForPhase: Long, percent: Int, meter: RateTracker) -> Unit
+    ) {
+        val client = bleClient
+        val mtu = client.ensureMtu()
+        if (mtu < 100) throw IllegalStateException("BLE MTU too small ($mtu). Reconnect and retry.")
+        val chunkSize = client.maxOtaChunkSize()
+        val total = firmware.size.toLong()
+        val meter = RateTracker()
+        client.otaBegin(firmware.size)
+        var offset = 0
+        var retries = 0
+        try {
+            while (offset < firmware.size) {
+                val end = minOf(offset + chunkSize, firmware.size)
+                val written = client.otaChunk(firmware.copyOfRange(offset, end), offset)
+                if (written < 0) {
+                    if (++retries > 8) throw IllegalStateException("OTA chunk rejected at $offset")
+                    delay(50)
+                    continue
+                }
+                if (written > offset) {
+                    offset = written
+                    retries = 0
+                } else if (++retries > 8) {
+                    throw IllegalStateException("OTA stuck at $offset")
+                }
+                emit("upload", offset.toLong(), total, (offset * 97L / firmware.size).toInt(), meter)
+            }
+            emit("apply", total, total, 98, meter)
+            client.otaEnd()
+            emit("apply", total, total, 100, meter)
+        } catch (e: Exception) {
+            runCatching { client.otaAbort() }
+            throw e
+        }
+    }
+
+    /**
      * Uploads a firmware image and flashes it.
      *
      * When [storeName] is set the image is first written to the device's
@@ -319,7 +366,26 @@ class Esp32PlayerRepository @Inject constructor(
                 skipUpload = stored == firmware.size.toLong()
                 if (skipUpload) Timber.i("OTA: %s already on device, flashing directly", storeName)
             }
-            if (!skipUpload) bleClient.fileOtaBegin(firmware.size, target, storeName)
+            // Boards older than v1.0.28 reject images above 2 MB in `file.begin`
+            // (the current master image is ~2.04 MB). Their legacy `ota.*`
+            // channel only checks the OTA slot (3 MB), so use it as a one-time
+            // bridge: it installs the firmware that has the new limit.
+            var legacyFallback = false
+            if (!skipUpload) {
+                try {
+                    bleClient.fileOtaBegin(firmware.size, target, storeName)
+                } catch (e: Exception) {
+                    val reason = e.message.orEmpty()
+                    if (target == "master" &&
+                        reason.contains("INVALID_SIZE", ignoreCase = true)
+                    ) {
+                        Timber.w("file.begin rejected (%s): old firmware limit, using ota.* bridge", reason)
+                        legacyFallback = true
+                    } else {
+                        throw e
+                    }
+                }
+            }
             val total = firmware.size.toLong()
             val uploadMeter = RateTracker()
             var offset = 0
@@ -342,6 +408,11 @@ class Esp32PlayerRepository @Inject constructor(
 
             var mtuRecoveries = 0
             var attempts = 0
+
+            if (legacyFallback) {
+                legacyMasterOta(firmware, ::emit)
+                return@safeApiCall
+            }
 
             suspend fun resyncFromDevice(fallback: Int): Int {
                 val st = runCatching { bleClient.fileOtaStatus() }.getOrNull() ?: return fallback
