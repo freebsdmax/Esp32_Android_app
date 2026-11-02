@@ -54,16 +54,54 @@ class EspFlasher(
     private val rx = ByteArrayOutputStream()
     private val noise = ByteArrayOutputStream()
 
+    /** Окреме з'єднання лише для vendor-запитів керування DTR/RTS (CH343). */
+    private var lineConn: android.hardware.usb.UsbDeviceConnection? = null
+    private var lastDtr = false
+    private var lastRts = false
+
     /** Відкриває порт. Скидання в режим завантажувача робить [flash]. */
     fun open(baud: Int = 115200) {
         port.open(usbManager.openDevice(port.device))
         port.setParameters(baud, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+        lineConn = runCatching { usbManager.openDevice(port.device) }.getOrNull()
         runCatching {
             port.dtr = false
             port.rts = false
         }
         Thread.sleep(150)
         runCatching { port.purgeHwBuffers(true, true) }
+    }
+
+    /**
+     * CH342/CH343/CH9102 (VID 1A86, PID 55D2–55D7) не реагують на
+     * SET_CONTROL_LINE_STATE, який шле usb-serial-for-android: WCH-драйвери
+     * використовують vendor-запит 0xA4 (bmRequestType 0x40), а value —
+     * інвертований регістр модему (біт 5 = DTR, біт 6 = RTS).
+     */
+    private fun isCh343Family(): Boolean {
+        val dev = port.device
+        return dev.vendorId == 0x1A86 && dev.productId in 0x55D2..0x55D7
+    }
+
+    /** Змінює DTR/RTS і в обхід бібліотеки (для CH343), і через неї. */
+    private fun setLines(dtr: Boolean, rts: Boolean) {
+        lastDtr = dtr
+        lastRts = rts
+        var control = 0
+        if (dtr) control = control or 0x20
+        if (rts) control = control or 0x40
+        val wValue = control.inv() and 0xFFFF
+
+        val conn = lineConn ?: runCatching { usbManager.openDevice(port.device) }
+            .getOrNull()
+            ?.also { lineConn = it }
+        if (conn != null && isCh343Family()) {
+            // CMD_C2 (0xA4): USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_OUT
+            runCatching { conn.controlTransfer(0x40, 0xA4, wValue, 0, null, 0, 1000) }
+        }
+        // Кеш бібліотеки — для CP210x/FTDI/CDC та CH340/CH341.
+        runCatching { port.dtr = dtr }
+        runCatching { port.rts = rts }
     }
 
     /**
@@ -77,8 +115,9 @@ class EspFlasher(
         val enLine = if (io0Line == LINE_DTR) LINE_RTS else LINE_DTR
 
         fun set(line: Int, asserted: Boolean, inverted: Boolean) {
-            val value = if (inverted) !asserted else asserted
-            if (line == LINE_DTR) port.dtr = value else port.rts = value
+            val on = if (inverted) !asserted else asserted
+            if (line == LINE_DTR) setLines(dtr = on, rts = lastRts)
+            else setLines(dtr = lastDtr, rts = on)
         }
 
         // обидві лінії відпущені
@@ -97,18 +136,13 @@ class EspFlasher(
 
     /** Скидання для вбудованого USB-Serial/JTAG (ESP32-S3/C3 без окремого моста). */
     private fun usbJtagReset() {
-        port.rts = false
-        port.dtr = false          // idle
+        setLines(dtr = false, rts = false)   // idle
         Thread.sleep(100)
-        port.dtr = true           // тримаємо IO0
-        port.rts = false
+        setLines(dtr = true, rts = false)    // тримаємо IO0
         Thread.sleep(100)
-        port.rts = true           // reset
-        port.dtr = false
-        port.rts = true
+        setLines(dtr = false, rts = true)    // reset
         Thread.sleep(100)
-        port.dtr = false
-        port.rts = false
+        setLines(dtr = false, rts = false)
         Thread.sleep(60)
     }
 
@@ -163,6 +197,8 @@ class EspFlasher(
 
     fun close() {
         runCatching { port.close() }
+        runCatching { lineConn?.close() }
+        lineConn = null
     }
 
     /** Синхронізація з ROM bootloader. */
@@ -194,11 +230,18 @@ class EspFlasher(
     ): Result = withContext(Dispatchers.IO) {
         try {
             listener.onLog(
-                "Порт %04X:%04X, драйвер %s".format(
+                "Порт %04X:%04X, драйвер %s%s".format(
                     port.device.vendorId, port.device.productId,
-                    port.javaClass.simpleName
+                    port.javaClass.simpleName,
+                    if (isCh343Family()) " (CH343 vendor-режим ліній)" else ""
                 )
             )
+            if (isCh343Family()) {
+                listener.onLog(
+                    if (lineConn != null) "Лінії DTR/RTS: прямий vendor-запит 0xA4"
+                    else "Лінії DTR/RTS: немає прямого доступу, тільки драйвер"
+                )
+            }
             if (!enterBootloader(listener)) {
                 return@withContext Result.Error(
                     "Чіп не вийшов у режим завантажувача автоматично. " +
