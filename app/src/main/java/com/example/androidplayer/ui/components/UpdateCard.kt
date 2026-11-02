@@ -101,6 +101,16 @@ fun UpdatesCard(
                     progress = state.progress / 100f,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (state.speed > 0 || state.eta >= 0) {
+                    Text(
+                        text = buildList {
+                            if (state.speed > 0) add(Loc.speedText(state.speed))
+                            if (state.eta >= 0) add(Loc.etaText(state.eta))
+                        }.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             state.status?.let {

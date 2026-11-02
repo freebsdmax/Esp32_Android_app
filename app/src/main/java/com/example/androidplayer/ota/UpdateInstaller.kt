@@ -41,6 +41,10 @@ class UpdateInstaller @Inject constructor(
         val percent: Int = 0,
         val status: String? = null,
         val error: String? = null,
+        /** Швидкість поточної фази, байт/с (0 = ще невідомо). */
+        val speed: Long = 0,
+        /** Скільки секунд лишилось у поточній фазі (-1 = невідомо). */
+        val eta: Long = -1,
         /** Incremented every time a transfer finishes (success or failure). */
         val finishedCount: Int = 0,
         val lastSuccess: Boolean = false
@@ -72,16 +76,29 @@ class UpdateInstaller @Inject constructor(
 
             try {
                 val file = File(context.cacheDir, "updates/${asset.name}")
+                val downloadStart = android.os.SystemClock.elapsedRealtime()
                 github.download(asset.url, file) { percent ->
                     val overall = if (target == "slave") percent / 3 else percent / 2
+                    // Швидкість завантаження: байти / час з початку фази.
+                    val elapsedMs = (android.os.SystemClock.elapsedRealtime() - downloadStart)
+                        .coerceAtLeast(1)
+                    val doneBytes = if (asset.size > 0) asset.size * percent / 100 else 0L
+                    val speed = if (elapsedMs > 700 && doneBytes > 0)
+                        doneBytes * 1000 / elapsedMs else 0L
+                    val eta = if (speed > 0 && asset.size > 0 && doneBytes < asset.size)
+                        (asset.size - doneBytes) / speed else -1L
                     _progress.value = _progress.value.copy(
                         percent = overall,
-                        status = Loc.updateDownloading(asset.name)
+                        status = Loc.updateDownloading(asset.name),
+                        speed = speed,
+                        eta = eta
                     )
-                    notifyProgress(label, overall, apply = false)
+                    notifyProgress(label, overall, apply = false, speed = speed, eta = eta)
                 }
 
-                _progress.value = _progress.value.copy(status = Loc.updateFlashing(), percent = 33)
+                _progress.value = _progress.value.copy(
+                    status = Loc.updateFlashing(), percent = 33, speed = 0, eta = -1
+                )
                 val bytes = file.readBytes()
                 val uploadShare = if (target == "slave") 67 else 50
                 val uploadBase = if (target == "slave") 33 else 50
@@ -91,7 +108,9 @@ class UpdateInstaller @Inject constructor(
                     val overall = uploadBase + (transfer.percent * uploadShare / 100)
                     _progress.value = _progress.value.copy(
                         percent = overall,
-                        status = Loc.updateFlashingPercent(transfer.percent)
+                        status = Loc.updateFlashingPercent(transfer.percent),
+                        speed = transfer.bytesPerSecond,
+                        eta = transfer.etaSeconds
                     )
                     notifyProgress(
                         label,

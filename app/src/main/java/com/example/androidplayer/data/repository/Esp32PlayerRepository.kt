@@ -307,7 +307,6 @@ class Esp32PlayerRepository @Inject constructor(
         val client = bleClient
         val mtu = client.ensureMtu()
         if (mtu < 100) throw IllegalStateException("BLE MTU too small ($mtu). Reconnect and retry.")
-        val chunkSize = client.maxOtaChunkSize()
         val total = firmware.size.toLong()
         val meter = RateTracker()
         client.otaBegin(firmware.size)
@@ -315,6 +314,8 @@ class Esp32PlayerRepository @Inject constructor(
         var retries = 0
         try {
             while (offset < firmware.size) {
+                // Перераховуємо на кожен кадр: MTU може змінитися під час передачі.
+                val chunkSize = client.maxOtaChunkSize(offset, "ota.data")
                 val end = minOf(offset + chunkSize, firmware.size)
                 val written = client.otaChunk(firmware.copyOfRange(offset, end), offset)
                 if (written < 0) {

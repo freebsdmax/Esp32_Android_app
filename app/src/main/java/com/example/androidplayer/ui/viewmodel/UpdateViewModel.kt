@@ -56,6 +56,10 @@ class UpdateViewModel @Inject constructor(
         val slaveUpdate: Boolean = false,
         val busy: Boolean = false,
         val progress: Int = 0,
+        /** Швидкість поточної фази (байт/с), 0 = невідомо */
+        val speed: Long = 0,
+        /** Секунд до кінця поточної фази, -1 = невідомо */
+        val eta: Long = -1,
         val status: String? = null,
         val error: String? = null,
         val connected: Boolean = false
@@ -82,6 +86,8 @@ class UpdateViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     busy = p.running,
                     progress = p.percent,
+                    speed = p.speed,
+                    eta = p.eta,
                     status = p.status,
                     error = p.error
                 )

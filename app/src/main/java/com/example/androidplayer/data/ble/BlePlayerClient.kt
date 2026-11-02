@@ -602,13 +602,12 @@ class BlePlayerClient(context: Context) {
     }
 
     suspend fun otaChunk(chunk: ByteArray, offset: Int): Int {
-        val encoded = Base64.encodeToString(chunk, Base64.NO_WRAP)
+        // Дрібний MTU може змінитися просто посеред передачі, тому кадр
+        // підрізається під поточний ліміт замість помилки.
+        val maxRaw = maxOtaChunkSize(offset, "ota.data")
+        val use = if (chunk.size > maxRaw) chunk.copyOfRange(0, maxRaw) else chunk
+        val encoded = Base64.encodeToString(use, Base64.NO_WRAP)
         val payload = JSONObject().put("offset", offset).put("data", encoded).toString()
-        val fullLen = 4 + "ota.data:".length + payload.toByteArray(Charsets.UTF_8).size
-        if (fullLen > negotiatedMtu - 3) {
-            throw IllegalStateException(
-                "BLE MTU too small (mtu=$negotiatedMtu, need ${fullLen + 3}). Reconnect BLE.")
-        }
         val result = JSONObject(rpc("ota.data", payload))
         if (!result.optBoolean("success")) {
             return result.optInt("written", -1)
@@ -708,16 +707,12 @@ class BlePlayerClient(context: Context) {
     }
 
     suspend fun fileOtaChunk(chunk: ByteArray, offset: Int): Int {
-        val encoded = Base64.encodeToString(chunk, Base64.NO_WRAP)
+        // Підрізаємо під поточний MTU (він може змінитися посеред передачі).
+        val maxRaw = maxOtaChunkSize(offset, "file.data")
+        val use = if (chunk.size > maxRaw) chunk.copyOfRange(0, maxRaw) else chunk
+        val encoded = Base64.encodeToString(use, Base64.NO_WRAP)
         val payload = JSONObject().put("offset", offset).put("data", encoded).toString()
-        val fullLen = 4 + "file.data:".length + payload.toByteArray(Charsets.UTF_8).size
-        lastChunkCommandBytes = fullLen
-        val limit = maxCommandBytes()
-        if (fullLen > limit) {
-            throw IllegalStateException(
-                "Chunk command of $fullLen B does not fit into $limit B (mtu=$negotiatedMtu)"
-            )
-        }
+        lastChunkCommandBytes = 4 + "file.data:".length + payload.toByteArray(Charsets.UTF_8).size
         val result = JSONObject(rpc("file.data", payload))
         if (result.optBoolean("success")) {
             lastFileOtaError = ""
@@ -1118,17 +1113,21 @@ class BlePlayerClient(context: Context) {
      * Відправка команди
      */
     @SuppressLint("MissingPermission")
-    fun maxOtaChunkSize(): Int {
-        var attPayload = (negotiatedMtu - 3).coerceAtLeast(20)
-        val observed = observedCommandBytes
-        if (observed in 1 until attPayload) {
-            attPayload = observed
-        }
-        // "rpc:" + "file.data:" + {"offset":NNNNNNN,"data":"BASE64"}
-        val overhead = 4 + 9 + 10 + 7 + 9 + 2
-        val b64Budget = attPayload - overhead
-        if (b64Budget < 24) return 16
-        return ((b64Budget / 4) * 3).coerceAtLeast(16).coerceAtMost(340)
+    /**
+     * Скільки сирих байт влазить в один `ota.data`/`file.data` кадр.
+     *
+     * Рахуємо точну довжину команди (префікс + JSON + base64 4:3) з реальним
+     * offset і 8-байтовим запасом: MTU може змінитися під час передачі, а
+     * фіксована формула раніше давала «need 513 при mtu=512».
+     */
+    fun maxOtaChunkSize(offset: Int = 0, method: String = "file.data"): Int {
+        val limit = maxCommandBytes()
+        val prefix = 4 + method.length + 1                 // "rpc:" + method + ":"
+        val emptyJson = JSONObject().put("offset", offset).put("data", "")
+            .toString().toByteArray(Charsets.UTF_8).size
+        val budget = limit - prefix - emptyJson - 8
+        if (budget < 8) return 8
+        return ((budget / 4) * 3).coerceIn(8, 320)
     }
 
     /** How many bytes of a command the device can really receive (0 = unknown). */
