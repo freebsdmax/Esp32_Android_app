@@ -95,13 +95,6 @@ fun OtaScreen(
                 onDismiss = { viewModel.clearError() }
             )
         }
-
-        uiState.errorMessage?.let { errorMessage ->
-            ErrorCard(
-                message = errorMessage,
-                onDismiss = { viewModel.clearError() }
-            )
-        }
     }
 }
 

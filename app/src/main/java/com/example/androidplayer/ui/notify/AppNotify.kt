@@ -6,6 +6,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.androidplayer.MainActivity
@@ -71,7 +74,21 @@ object AppNotify {
         nextId = if (nextId >= LAST_ID) FIRST_ID else nextId + 1
     }
 
-    fun error(text: String) = post(Loc.notifErrorTitle(), text)
+    /** Спливаюче повідомлення (Toast) + запис у шторку. */
+    fun error(text: String) {
+        popup(text)
+        post(Loc.notifErrorTitle(), text)
+    }
 
-    fun info(text: String) = post(Loc.notifInfoTitle(), text)
+    fun info(text: String) {
+        popup(text)
+        post(Loc.notifInfoTitle(), text)
+    }
+
+    private fun popup(text: String) {
+        val ctx = context ?: return
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(ctx, text, Toast.LENGTH_LONG).show()
+        }
+    }
 }

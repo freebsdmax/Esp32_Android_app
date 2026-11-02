@@ -1,6 +1,7 @@
 package com.example.androidplayer.ui.screens
 
 import com.example.androidplayer.ui.i18n.tr
+import com.example.androidplayer.ui.notify.AppNotify
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,6 +34,13 @@ fun WifiSettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+
+    LaunchedEffect(uiState.saveMessage) {
+        uiState.saveMessage?.let { AppNotify.info(it) }
+    }
+    LaunchedEffect(error) {
+        error?.let { AppNotify.error(it) }
+    }
     
     Column(
         modifier = Modifier
@@ -89,22 +97,9 @@ fun WifiSettingsScreen(
                     )
                 }
                 
-                // Сообщение о сохранении
-                uiState.saveMessage?.let { message ->
-                    item {
-                        SuccessCard(message = message)
-                    }
-                }
             }
         }
         
-        // Обработка ошибок
-        error?.let { errorMessage ->
-            ErrorCard(
-                message = errorMessage,
-                onDismiss = { viewModel.clearError() }
-            )
-        }
     }
 }
 

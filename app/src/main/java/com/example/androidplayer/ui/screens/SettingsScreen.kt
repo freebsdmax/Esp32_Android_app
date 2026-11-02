@@ -228,9 +228,6 @@ fun SettingsScreen(
                 onPickSlave = { slavePicker.launch("application/octet-stream") }
             )
         }
-        if (uiState.isSaved && uiState.saveMessage != null) {
-            item { SavedBanner(uiState.saveMessage!!) }
-        }
     }
 }
 
@@ -503,14 +500,6 @@ private fun ManualFirmwareCard(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-            }
-            state.uploadMessage?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary)
-            }
-            state.errorMessage?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error)
             }
         }
     }
