@@ -345,6 +345,20 @@ object Loc {
         if (isUkrainian) "Дозвіл на USB ще не надано" else "USB access is not granted yet"
     fun usbGrantPermission(): String =
         if (isUkrainian) "Дати дозвіл USB" else "Allow USB access"
+    fun usbTestReset(): String =
+        if (isUkrainian) "Перевірити авто-скидання" else "Test auto-reset"
+    fun usbTestingReset(): String =
+        if (isUkrainian) "Перевірка авто-скидання…" else "Testing auto-reset…"
+    fun usbResetOk(): String =
+        if (isUkrainian) "Авто-скидання працює — чіп у режимі завантажувача"
+        else "Auto-reset works — the chip is in download mode"
+    fun usbResetFailed(): String =
+        if (isUkrainian)
+            "Авто-скидання не спрацювало: на цій платі DTR/RTS не керують BOOT/EN. " +
+                "Прошийте через BLE-OTA (без кабелю) або затисніть BOOT+RESET"
+        else
+            "Auto-reset did not work: DTR/RTS do not control BOOT/EN on this board. " +
+                "Use BLE OTA (no cable) or hold BOOT+RESET"
     fun usbUnsupported(): String =
         if (isUkrainian) "Цей USB-пристрій не є послідовним портом (потрібен USB-UART/CDC)"
         else "This USB device is not a serial port (USB-UART/CDC required)"

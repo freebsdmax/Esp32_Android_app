@@ -136,6 +136,14 @@ fun UsbFlashScreen(
                     }
 
                     OutlinedButton(
+                        onClick = { viewModel.testReset() },
+                        enabled = !state.busy && state.selected != null,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(Loc.usbTestReset())
+                    }
+
+                    OutlinedButton(
                         onClick = { viewModel.refreshDevices() },
                         modifier = Modifier.fillMaxWidth()
                     ) {

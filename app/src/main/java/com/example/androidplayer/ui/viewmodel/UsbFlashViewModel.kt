@@ -243,6 +243,16 @@ class UsbFlashViewModel @Inject constructor(
         }
     }
 
+    private fun newListener() = object : EspFlasher.Listener {
+        override fun onProgress(percent: Int, detail: String) {
+            _uiState.value = _uiState.value.copy(progress = percent, status = detail)
+        }
+
+        override fun onLog(line: String) {
+            _uiState.value = _uiState.value.copy(log = (_uiState.value.log + line).takeLast(300))
+        }
+    }
+
     /** Прошиває вибраний пристрій завантаженим образом. */
     fun flash() {
         val st = _uiState.value
@@ -285,15 +295,7 @@ class UsbFlashViewModel @Inject constructor(
             }
 
             val flasher = EspFlasher(usbManager, port)
-            val listener = object : EspFlasher.Listener {
-                override fun onProgress(percent: Int, detail: String) {
-                    _uiState.value = _uiState.value.copy(progress = percent, status = detail)
-                }
-
-                override fun onLog(line: String) {
-                    _uiState.value = _uiState.value.copy(log = (_uiState.value.log + line).takeLast(200))
-                }
-            }
+            val listener = newListener()
 
             try {
                 withContext(Dispatchers.IO) { flasher.open() }
@@ -310,6 +312,58 @@ class UsbFlashViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Timber.e(e, "USB flash failed")
+                _uiState.value = _uiState.value.copy(busy = false, error = e.message ?: "USB error")
+            } finally {
+                withContext(Dispatchers.IO) { flasher.close() }
+            }
+        }
+    }
+
+    /**
+     * Перевіряє авто-скидання без прошивки: перебирає всі варіанти DTR/RTS
+     * і повідомляє, чи відповів ROM bootloader.
+     */
+    fun testReset() {
+        val st = _uiState.value
+        if (st.busy) return
+        val info = st.selected ?: run {
+            _uiState.value = st.copy(error = Loc.usbNoDevice())
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                busy = true, progress = 0, log = emptyList(), error = null,
+                status = Loc.usbTestingReset()
+            )
+            val device = findDevice(info) ?: run {
+                _uiState.value = _uiState.value.copy(busy = false, error = Loc.usbNoDevice())
+                return@launch
+            }
+            if (!ensurePermission(device)) {
+                _uiState.value = _uiState.value.copy(busy = false, error = Loc.usbPermissionDenied())
+                return@launch
+            }
+            val driver = UsbSerialProber.getDefaultProber().probeDevice(device) ?: run {
+                _uiState.value = _uiState.value.copy(busy = false, error = Loc.usbUnsupported())
+                return@launch
+            }
+            val port = driver.ports.firstOrNull() ?: run {
+                _uiState.value = _uiState.value.copy(busy = false, error = Loc.usbUnsupported())
+                return@launch
+            }
+            val flasher = EspFlasher(usbManager, port)
+            val listener = newListener()
+            try {
+                withContext(Dispatchers.IO) { flasher.open() }
+                val ok = flasher.testBootloader(listener)
+                _uiState.value = _uiState.value.copy(
+                    busy = false,
+                    progress = 0,
+                    status = if (ok) Loc.usbResetOk() else null,
+                    error = if (ok) null else Loc.usbResetFailed()
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "USB reset test failed")
                 _uiState.value = _uiState.value.copy(busy = false, error = e.message ?: "USB error")
             } finally {
                 withContext(Dispatchers.IO) { flasher.close() }

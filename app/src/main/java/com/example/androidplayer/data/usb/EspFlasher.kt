@@ -44,6 +44,9 @@ class EspFlasher(
     private val OP_SYNC = 0x08
     private val OP_MD5 = 0x13
 
+    private val LINE_DTR = 0
+    private val LINE_RTS = 1
+
     private val BLOCK_SIZE = 4096
     private val TIMEOUT_MS = 3000
     private val FLASH_TIMEOUT_MS = 15000
@@ -64,17 +67,32 @@ class EspFlasher(
     }
 
     /**
-     * esptool-сумісне авто-скидання: DTR → IO0, RTS → EN
-     * (два транзистори на більшості плат з USB-UART: CH340/CP210x/FTDI).
+     * Одна спроба скидання: тримаємо IO0 у низькому рівні, смикаємо EN.
+     *
+     * @param io0Line лінія, підключена до IO0 (DTR або RTS)
+     * @param io0Inverted true — на платі інвертор по лінії IO0
+     * @param enInverted  true — на платі інвертор по лінії EN
      */
-    private fun classicReset() {
-        port.dtr = false          // IO0 = HIGH
-        port.rts = true           // EN = LOW, чіп у скиданні
-        Thread.sleep(120)
-        port.dtr = true           // IO0 = LOW
-        port.rts = false          // EN = HIGH → старт у download mode
+    private fun pulseReset(io0Line: Int, io0Inverted: Boolean, enInverted: Boolean) {
+        val enLine = if (io0Line == LINE_DTR) LINE_RTS else LINE_DTR
+
+        fun set(line: Int, asserted: Boolean, inverted: Boolean) {
+            val value = if (inverted) !asserted else asserted
+            if (line == LINE_DTR) port.dtr = value else port.rts = value
+        }
+
+        // обидві лінії відпущені
+        set(io0Line, false, io0Inverted)
+        set(enLine, false, enInverted)
         Thread.sleep(60)
-        port.dtr = false          // IO0 = HIGH
+        // IO0 = LOW, EN = LOW → чіп у скиданні
+        set(io0Line, true, io0Inverted)
+        set(enLine, true, enInverted)
+        Thread.sleep(150)
+        // EN = HIGH → старт; IO0 ще LOW → download mode
+        set(enLine, false, enInverted)
+        Thread.sleep(80)
+        set(io0Line, false, io0Inverted)
     }
 
     /** Скидання для вбудованого USB-Serial/JTAG (ESP32-S3/C3 без окремого моста). */
@@ -94,43 +112,53 @@ class EspFlasher(
         Thread.sleep(60)
     }
 
-    /** Та сама класична схема, але з переставленими лініями (DTR → EN, RTS → IO0). */
-    private fun classicSwappedReset() {
-        port.rts = false          // IO0 = HIGH
-        port.dtr = true           // EN = LOW
-        Thread.sleep(120)
-        port.rts = true           // IO0 = LOW
-        port.dtr = false          // EN = HIGH → download mode
-        Thread.sleep(60)
-        port.rts = false          // IO0 = HIGH
-    }
-
     /**
-     * Пробує обидві схеми скидання (класичну і USB-JTAG), по два кола.
-     * Після кожного скидання — короткий SYNC; якщо чіп відповів, він уже
-     * в режимі завантажувача і кнопку BOOT натискати не треба.
+     * Перебирає всі варіанти розводки DTR/RTS (нормальна/переставлена,
+     * з інверторами й без) плюс послідовність USB-Serial/JTAG. Після кожного
+     * скидання — SYNC: якщо чіп відповів, він уже в режимі завантажувача.
      */
     private suspend fun enterBootloader(listener: Listener): Boolean {
         // Плата могла вже бути в режимі завантажувача (після BOOT+RESET).
-        if (runCatching { sync(listener, tries = 1, timeoutMs = 800) }.getOrDefault(false)) return true
+        if (runCatching { sync(listener, tries = 1, timeoutMs = 700) }.getOrDefault(false)) {
+            listener.onLog("Чіп уже в режимі завантажувача")
+            return true
+        }
 
-        val strategies: List<Pair<String, () -> Unit>> = listOf(
-            "classic" to ::classicReset,
-            "classic-swapped" to ::classicSwappedReset,
-            "usb-jtag" to ::usbJtagReset
+        data class Variant(val label: String, val run: () -> Unit)
+
+        val variants = listOf(
+            Variant("DTR→IO0, RTS→EN") { pulseReset(LINE_DTR, false, false) },
+            Variant("RTS→IO0, DTR→EN") { pulseReset(LINE_RTS, false, false) },
+            Variant("DTR→IO0, RTS→EN, IO0 інверт.") { pulseReset(LINE_DTR, true, false) },
+            Variant("DTR→IO0, RTS→EN, EN інверт.") { pulseReset(LINE_DTR, false, true) },
+            Variant("DTR→IO0, RTS→EN, обидві інверт.") { pulseReset(LINE_DTR, true, true) },
+            Variant("RTS→IO0, DTR→EN, IO0 інверт.") { pulseReset(LINE_RTS, true, false) },
+            Variant("RTS→IO0, DTR→EN, EN інверт.") { pulseReset(LINE_RTS, false, true) },
+            Variant("RTS→IO0, DTR→EN, обидві інверт.") { pulseReset(LINE_RTS, true, true) },
+            Variant("USB-Serial/JTAG") { usbJtagReset() }
         )
-        for (round in 1..2) {
-            for ((name, reset) in strategies) {
-                listener.onLog("Авто-скидання ($name), спроба $round…")
-                runCatching { reset() }
-                Thread.sleep(120)
-                runCatching { port.purgeHwBuffers(true, true) }
-                val ok = runCatching { sync(listener, tries = 3, timeoutMs = 1200) }
-                    .getOrDefault(false)
-                if (ok) return true
+
+        for (v in variants) {
+            listener.onLog("Авто-скидання: ${v.label}…")
+            val err = runCatching { v.run() }.exceptionOrNull()
+            if (err != null) {
+                listener.onLog("  лінії DTR/RTS: ${err.message ?: err::class.java.simpleName}")
+            }
+            Thread.sleep(100)
+            runCatching { port.purgeHwBuffers(true, true) }
+            val ok = runCatching { sync(listener, tries = 2, timeoutMs = 1000) }
+                .getOrDefault(false)
+            if (ok) {
+                listener.onLog("Режим завантажувача: ${v.label}")
+                return true
             }
         }
         return false
+    }
+
+    /** Публічна перевірка авто-скидання (кнопка «Перевірити авто-скидання»). */
+    suspend fun testBootloader(listener: Listener): Boolean = withContext(Dispatchers.IO) {
+        enterBootloader(listener)
     }
 
     fun close() {
@@ -165,10 +193,17 @@ class EspFlasher(
         listener: Listener
     ): Result = withContext(Dispatchers.IO) {
         try {
+            listener.onLog(
+                "Порт %04X:%04X, драйвер %s".format(
+                    port.device.vendorId, port.device.productId,
+                    port.javaClass.simpleName
+                )
+            )
             if (!enterBootloader(listener)) {
                 return@withContext Result.Error(
                     "Чіп не вийшов у режим завантажувача автоматично. " +
-                        "Затисніть BOOT, натисніть RESET і спробуйте ще раз."
+                        "На цій платі лінії DTR/RTS не керують BOOT/EN — затисніть BOOT, " +
+                        "натисніть RESET, або прошийте через BLE-OTA."
                 )
             }
 
