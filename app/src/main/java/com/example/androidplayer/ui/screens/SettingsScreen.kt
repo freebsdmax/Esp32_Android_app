@@ -60,6 +60,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val canLearn by viewModel.canLearnStatus.collectAsStateWithLifecycle()
+    val canKeys by viewModel.canKeys.collectAsStateWithLifecycle()
     val connected by ble.isConnected.collectAsStateWithLifecycle()
     val otaViewModel: OtaViewModel = hiltViewModel()
     val otaState by otaViewModel.uiState.collectAsStateWithLifecycle()
@@ -186,7 +187,10 @@ fun SettingsScreen(
                 onSave = { viewModel.saveCanConfig() },
                 learnStatus = canLearn,
                 onLearn = { viewModel.startCanLearn(it) },
-                onLearnCancel = { viewModel.cancelCanLearn() }
+                onLearnCancel = { viewModel.cancelCanLearn() },
+                keys = canKeys,
+                onRemoveKey = { viewModel.removeCanKey(it) },
+                onClearKeys = { viewModel.clearCanKeys() }
             )
         }
         item {
@@ -622,7 +626,10 @@ private fun CanCard(
     onSave: () -> Unit,
     learnStatus: String?,
     onLearn: (Int) -> Unit,
-    onLearnCancel: () -> Unit
+    onLearnCancel: () -> Unit,
+    keys: List<BlePlayerClient.CanKey>,
+    onRemoveKey: (Int) -> Unit,
+    onClearKeys: () -> Unit
 ) {
     var idText by remember(id) { mutableStateOf("0x" + id.toString(16).uppercase()) }
     var mnText by remember(maskNext) { mutableStateOf("0x" + maskNext.toString(16).uppercase()) }
@@ -726,6 +733,30 @@ private fun CanCard(
             learnStatus?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary)
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Text(Loc.canKeysTitle(), style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium)
+            if (keys.isEmpty()) {
+                Text(Loc.canKeysEmpty(), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                keys.forEachIndexed { index, k ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            Loc.canKeyRow(k.action, k.id, k.byte, k.mask, k.value),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { onRemoveKey(index) }) {
+                            Text(Loc.remove(), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                OutlinedButton(onClick = onClearKeys, modifier = Modifier.fillMaxWidth()) {
+                    Text(Loc.clearAll())
+                }
             }
         }
     }

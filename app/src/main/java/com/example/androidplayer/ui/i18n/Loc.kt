@@ -331,6 +331,20 @@ object Loc {
     fun canLearnDone(id: Long, data1: Int): String =
         if (isUkrainian) "Готово: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
         else "Done: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
+    fun canKeysTitle(): String = if (isUkrainian) "Вивчені кнопки" else "Learned buttons"
+    fun canKeysEmpty(): String = if (isUkrainian) "Ще нічого не вивчено" else "Nothing learned yet"
+    fun canKeyRow(action: Int, id: Long, byte: Int, mask: Int, value: Int): String {
+        val name = when (action) {
+            0 -> "NEXT"; 1 -> "PREV"; else -> "MODE"
+        }
+        return if (mask == 0) {
+            "$name: ID=0x${id.toString(16).uppercase()}"
+        } else {
+            "$name: ID=0x${id.toString(16).uppercase()}, byte$byte&0x${mask.toString(16).uppercase()}=0x${value.toString(16).uppercase()}"
+        }
+    }
+    fun remove(): String = if (isUkrainian) "видалити" else "remove"
+    fun clearAll(): String = if (isUkrainian) "Очистити всі" else "Clear all"
     fun canLearnFailed(): String =
         if (isUkrainian) "Кадр не знайдено — спробуй ще раз" else "No frame found — try again"
 

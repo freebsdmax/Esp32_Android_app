@@ -627,6 +627,18 @@ class Esp32PlayerRepository @Inject constructor(
         bleClient.setCanConfig(cfg)
     }
 
+    suspend fun canKeys(): Result<List<BlePlayerClient.CanKey>> = safeApiCall {
+        bleClient.canKeys()
+    }
+
+    suspend fun canKeyRemove(index: Int): Result<Unit> = safeApiCall {
+        bleClient.canKeyRemove(index)
+    }
+
+    suspend fun canKeysClear(): Result<Unit> = safeApiCall {
+        bleClient.canKeysClear()
+    }
+
     suspend fun canLearnStart(action: Int, seconds: Int = 12): Result<Unit> = safeApiCall {
         bleClient.canLearnStart(action, seconds)
     }

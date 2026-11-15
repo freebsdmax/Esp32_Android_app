@@ -37,6 +37,7 @@ class SettingsViewModel @Inject constructor(
         loadSleepSettings()
         loadSeekConfig()
         loadCanConfig()
+        loadCanKeys()
         loadAuthConfig()
         loadBleName()
         loadLogsConfig()
@@ -407,6 +408,30 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private val _canKeys = MutableStateFlow<List<com.example.androidplayer.data.ble.BlePlayerClient.CanKey>>(emptyList())
+    val canKeys: StateFlow<List<com.example.androidplayer.data.ble.BlePlayerClient.CanKey>> =
+        _canKeys.asStateFlow()
+
+    fun loadCanKeys() {
+        viewModelScope.launch {
+            repository.canKeys().onSuccess { _canKeys.value = it }
+        }
+    }
+
+    fun removeCanKey(index: Int) {
+        viewModelScope.launch {
+            repository.canKeyRemove(index)
+            loadCanKeys()
+        }
+    }
+
+    fun clearCanKeys() {
+        viewModelScope.launch {
+            repository.canKeysClear()
+            _canKeys.value = emptyList()
+        }
+    }
+
     private val _canLearnStatus = MutableStateFlow<String?>(null)
     val canLearnStatus: StateFlow<String?> = _canLearnStatus.asStateFlow()
 
@@ -429,6 +454,7 @@ class SettingsViewModel @Inject constructor(
                     3 -> {
                         _canLearnStatus.value = Loc.canLearnDone(st.id, st.data1)
                         loadCanConfig()
+                        loadCanKeys()
                         return@launch
                     }
                     4 -> {

@@ -907,6 +907,36 @@ class BlePlayerClient(context: Context) {
         val data1: Int
     )
 
+    data class CanKey(val id: Long, val byte: Int, val mask: Int, val value: Int, val action: Int)
+
+    suspend fun canKeys(): List<CanKey> {
+        val json = JSONObject(rpc("can.keys.get"))
+        val arr = json.optJSONArray("keys") ?: return emptyList()
+        val out = ArrayList<CanKey>(arr.length())
+        for (i in 0 until arr.length()) {
+            val k = arr.optJSONObject(i) ?: continue
+            out.add(
+                CanKey(
+                    id = k.optLong("id", 0),
+                    byte = k.optInt("byte", 0),
+                    mask = k.optInt("mask", 0),
+                    value = k.optInt("value", 0),
+                    action = k.optInt("action", 0)
+                )
+            )
+        }
+        return out
+    }
+
+    suspend fun canKeyRemove(index: Int) {
+        val payload = JSONObject().put("index", index).toString()
+        runCatching { rpc("can.keys.remove", payload) }
+    }
+
+    suspend fun canKeysClear() {
+        runCatching { rpc("can.keys.clear") }
+    }
+
     suspend fun canLearnStart(action: Int, seconds: Int = 12) {
         val payload = JSONObject().put("action", action).put("seconds", seconds).toString()
         val json = JSONObject(rpc("can.learn.start", payload))
