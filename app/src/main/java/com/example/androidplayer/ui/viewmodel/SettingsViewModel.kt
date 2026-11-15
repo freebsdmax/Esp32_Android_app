@@ -13,6 +13,8 @@ import javax.inject.Inject
 import com.example.androidplayer.data.model.SleepSettings
 import com.example.androidplayer.data.repository.Esp32PlayerRepository
 import com.example.androidplayer.ui.i18n.tr
+import kotlinx.coroutines.delay
+import com.example.androidplayer.ui.i18n.Loc
 import timber.log.Timber
 
 /**
@@ -402,6 +404,47 @@ class SettingsViewModel @Inject constructor(
                     )
                 }
             )
+        }
+    }
+
+    private val _canLearnStatus = MutableStateFlow<String?>(null)
+    val canLearnStatus: StateFlow<String?> = _canLearnStatus.asStateFlow()
+
+    /** Запускає навчання CAN-кнопки: 0=NEXT, 1=PREV, 2=MODE. */
+    fun startCanLearn(action: Int, seconds: Int = 12) {
+        viewModelScope.launch {
+            _canLearnStatus.value = Loc.canLearnBackground(seconds)
+            repository.canLearnStart(action, seconds).onFailure {
+                _canLearnStatus.value = it.message
+                return@launch
+            }
+            var waited = 0
+            while (waited < (seconds + 40) * 1000) {
+                delay(500)
+                waited += 500
+                val st = repository.canLearnStatus().getOrNull() ?: continue
+                when (st.state) {
+                    1 -> _canLearnStatus.value = Loc.canLearnBackground(st.secsLeft)
+                    2 -> _canLearnStatus.value = Loc.canLearnPress(st.secsLeft)
+                    3 -> {
+                        _canLearnStatus.value = Loc.canLearnDone(st.id, st.data1)
+                        loadCanConfig()
+                        return@launch
+                    }
+                    4 -> {
+                        _canLearnStatus.value = Loc.canLearnFailed()
+                        return@launch
+                    }
+                }
+            }
+            _canLearnStatus.value = Loc.canLearnFailed()
+        }
+    }
+
+    fun cancelCanLearn() {
+        viewModelScope.launch {
+            repository.canLearnCancel()
+            _canLearnStatus.value = null
         }
     }
 

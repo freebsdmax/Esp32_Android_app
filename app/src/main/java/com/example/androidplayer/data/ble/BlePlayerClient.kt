@@ -898,6 +898,38 @@ class BlePlayerClient(context: Context) {
         return getCanConfig()
     }
 
+    data class CanLearnStatus(
+        /** 0 idle, 1 фон, 2 чекає натискання, 3 готово, 4 не знайдено */
+        val state: Int,
+        val action: Int,
+        val secsLeft: Int,
+        val id: Long,
+        val data1: Int
+    )
+
+    suspend fun canLearnStart(action: Int, seconds: Int = 12) {
+        val payload = JSONObject().put("action", action).put("seconds", seconds).toString()
+        val json = JSONObject(rpc("can.learn.start", payload))
+        if (!json.optBoolean("success")) {
+            throw IllegalStateException(json.optString("error", "CAN learn rejected"))
+        }
+    }
+
+    suspend fun canLearnStatus(): CanLearnStatus {
+        val json = JSONObject(rpc("can.learn.status"))
+        return CanLearnStatus(
+            state = json.optInt("state", 0),
+            action = json.optInt("action", 0),
+            secsLeft = json.optInt("secs_left", 0),
+            id = json.optLong("id", 0),
+            data1 = json.optInt("data1", 0)
+        )
+    }
+
+    suspend fun canLearnCancel() {
+        runCatching { rpc("can.learn.cancel") }
+    }
+
     data class SeekConfig(val stepSeconds: Int = 10, val hold: Boolean = false)
 
     suspend fun getSeekConfig(): SeekConfig {

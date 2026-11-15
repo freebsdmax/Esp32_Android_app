@@ -627,6 +627,18 @@ class Esp32PlayerRepository @Inject constructor(
         bleClient.setCanConfig(cfg)
     }
 
+    suspend fun canLearnStart(action: Int, seconds: Int = 12): Result<Unit> = safeApiCall {
+        bleClient.canLearnStart(action, seconds)
+    }
+
+    suspend fun canLearnStatus(): Result<BlePlayerClient.CanLearnStatus> = safeApiCall {
+        bleClient.canLearnStatus()
+    }
+
+    suspend fun canLearnCancel(): Result<Unit> = safeApiCall {
+        bleClient.canLearnCancel()
+    }
+
     suspend fun getSeekConfig(): Result<BlePlayerClient.SeekConfig> = safeApiCall {
         bleClient.getSeekConfig()
     }

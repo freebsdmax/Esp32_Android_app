@@ -59,6 +59,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val canLearn by viewModel.canLearnStatus.collectAsStateWithLifecycle()
     val connected by ble.isConnected.collectAsStateWithLifecycle()
     val otaViewModel: OtaViewModel = hiltViewModel()
     val otaState by otaViewModel.uiState.collectAsStateWithLifecycle()
@@ -182,7 +183,10 @@ fun SettingsScreen(
                 debounceMs = uiState.canDebounceMs,
                 onBitrate = { viewModel.setCanField("bitrate", it.toLong()) },
                 onField = { key, value -> viewModel.setCanField(key, value) },
-                onSave = { viewModel.saveCanConfig() }
+                onSave = { viewModel.saveCanConfig() },
+                learnStatus = canLearn,
+                onLearn = { viewModel.startCanLearn(it) },
+                onLearnCancel = { viewModel.cancelCanLearn() }
             )
         }
         item {
@@ -615,7 +619,10 @@ private fun CanCard(
     debounceMs: Int,
     onBitrate: (Int) -> Unit,
     onField: (String, Long) -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    learnStatus: String?,
+    onLearn: (Int) -> Unit,
+    onLearnCancel: () -> Unit
 ) {
     var idText by remember(id) { mutableStateOf("0x" + id.toString(16).uppercase()) }
     var mnText by remember(maskNext) { mutableStateOf("0x" + maskNext.toString(16).uppercase()) }
@@ -697,6 +704,28 @@ private fun CanCard(
 
             Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
                 Text(tr("Зберегти"))
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(Loc.canLearnTitle(), style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium)
+            Text(Loc.canLearnHint(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(onClick = { onLearn(0) }) { Text(Loc.canLearnNext()) }
+                OutlinedButton(onClick = { onLearn(1) }) { Text(Loc.canLearnPrev()) }
+                OutlinedButton(onClick = { onLearn(2) }) { Text(Loc.canLearnMode()) }
+                OutlinedButton(onClick = onLearnCancel) { Text(Loc.canLearnCancel()) }
+            }
+
+            learnStatus?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary)
             }
         }
     }

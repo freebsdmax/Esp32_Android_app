@@ -315,6 +315,25 @@ object Loc {
     fun usbTargetSlave(): String = "Slave (Bluetooth)"
     fun usbTargetTitle(): String = if (isUkrainian) "Яку плату прошиваємо" else "Which board to flash"
 
+    fun canLearnTitle(): String =
+        if (isUkrainian) "🎓 Навчання кнопок" else "🎓 Learn buttons"
+    fun canLearnHint(): String =
+        if (isUkrainian) "Слухаємо шину, потім натисни кнопку в авто"
+        else "Listening to the bus, then press the button in the car"
+    fun canLearnNext(): String = if (isUkrainian) "NEXT" else "NEXT"
+    fun canLearnPrev(): String = if (isUkrainian) "PREV" else "PREV"
+    fun canLearnMode(): String = if (isUkrainian) "MODE" else "MODE"
+    fun canLearnCancel(): String = if (isUkrainian) "Скасувати" else "Cancel"
+    fun canLearnBackground(sec: Int): String =
+        if (isUkrainian) "Слухаю шину… залишилось $sec с" else "Listening… $sec s left"
+    fun canLearnPress(sec: Int): String =
+        if (isUkrainian) "Тепер натисни кнопку в авто! $sec с" else "Now press the button in the car! $sec s"
+    fun canLearnDone(id: Long, data1: Int): String =
+        if (isUkrainian) "Готово: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
+        else "Done: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
+    fun canLearnFailed(): String =
+        if (isUkrainian) "Кадр не знайдено — спробуй ще раз" else "No frame found — try again"
+
     fun usbTitle(): String = if (isUkrainian) "Прошивка по кабелю" else "Firmware over cable"
     fun usbSubtitle(): String =
         if (isUkrainian) "Аварійне відновлення через USB" else "Emergency recovery over USB"
