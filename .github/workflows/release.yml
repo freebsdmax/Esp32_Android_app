@@ -110,7 +110,7 @@ jobs:
             echo "## Встановлення"
             echo '```bash'
             echo "adb install -r Ford-Player-*.apk"
-            echo '\`\`\`'
+            echo '```'
             echo ""
             echo "Вимоги: Android 8.0+, BLE, дозвіл на сповіщення (Android 13+)."
           } > RELEASE_NOTES.md
