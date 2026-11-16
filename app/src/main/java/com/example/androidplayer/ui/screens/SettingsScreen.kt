@@ -190,7 +190,8 @@ fun SettingsScreen(
                 onLearnCancel = { viewModel.cancelCanLearn() },
                 keys = canKeys,
                 onRemoveKey = { viewModel.removeCanKey(it) },
-                onClearKeys = { viewModel.clearCanKeys() }
+                onClearKeys = { viewModel.clearCanKeys() },
+                onReloadKeys = { viewModel.loadCanKeys() }
             )
         }
         item {
@@ -629,7 +630,8 @@ private fun CanCard(
     onLearnCancel: () -> Unit,
     keys: List<BlePlayerClient.CanKey>,
     onRemoveKey: (Int) -> Unit,
-    onClearKeys: () -> Unit
+    onClearKeys: () -> Unit,
+    onReloadKeys: () -> Unit
 ) {
     var idText by remember(id) { mutableStateOf("0x" + id.toString(16).uppercase()) }
     var mnText by remember(maskNext) { mutableStateOf("0x" + maskNext.toString(16).uppercase()) }
@@ -736,8 +738,13 @@ private fun CanCard(
             }
 
             Spacer(Modifier.height(6.dp))
-            Text(Loc.canKeysTitle(), style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(Loc.canKeysTitle(), style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                TextButton(onClick = onReloadKeys) {
+                    Text(tr("Оновити"), style = MaterialTheme.typography.bodySmall)
+                }
+            }
             if (keys.isEmpty()) {
                 Text(Loc.canKeysEmpty(), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
