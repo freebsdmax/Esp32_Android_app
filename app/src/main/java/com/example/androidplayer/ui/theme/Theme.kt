@@ -96,17 +96,27 @@ fun AndroidPlayerTheme(
         context.getSharedPreferences("esp32_player_prefs", Context.MODE_PRIVATE)
     }
     val systemDark = isSystemInDarkTheme()
-    var darkTheme by remember {
-        mutableStateOf(prefs.getBoolean("dark_theme", systemDark))
-    }
+    fun readMode(): String =
+        prefs.getString("theme_mode", null)
+            ?: if (prefs.contains("dark_theme"))
+                (if (prefs.getBoolean("dark_theme", false)) "dark" else "light")
+            else "system"
+
+    var themeMode by remember { mutableStateOf(readMode()) }
     DisposableEffect(prefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "dark_theme") {
-                darkTheme = prefs.getBoolean("dark_theme", darkTheme)
+            if (key == "theme_mode" || key == "dark_theme") {
+                themeMode = readMode()
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    val darkTheme = when (themeMode) {
+        "dark" -> true
+        "light" -> false
+        else -> systemDark
     }
 
     val colorScheme = when {

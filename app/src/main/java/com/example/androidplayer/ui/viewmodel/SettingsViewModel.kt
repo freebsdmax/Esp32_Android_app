@@ -134,14 +134,17 @@ class SettingsViewModel @Inject constructor(
         val savedIp = prefs.getString("esp32_ip", DEFAULT_ESP32_IP) ?: DEFAULT_ESP32_IP
         val autoReconnect = prefs.getBoolean("auto_reconnect", true)
         val showNotifications = prefs.getBoolean("show_notifications", true)
-        val darkTheme = prefs.getBoolean("dark_theme", false)
+        val themeMode = prefs.getString("theme_mode", null)
+            ?: if (prefs.contains("dark_theme"))
+                (if (prefs.getBoolean("dark_theme", false)) "dark" else "light")
+            else "system"
         val miniPlayerAlways = prefs.getBoolean(MINI_PLAYER_ALWAYS, false)
         
         _uiState.value = SettingsUiState(
             esp32Ip = savedIp,
             autoReconnect = autoReconnect,
             showNotifications = showNotifications,
-            darkTheme = darkTheme,
+            themeMode = themeMode,
             miniPlayerAlways = miniPlayerAlways,
             updateAuto = checker.autoEnabled,
             updateIntervalHours = checker.intervalHours,
@@ -171,6 +174,11 @@ class SettingsViewModel @Inject constructor(
     /**
      * Обновление настроек
      */
+    fun setThemeMode(mode: String) {
+        prefs.edit().putString("theme_mode", mode).apply()
+        _uiState.value = _uiState.value.copy(themeMode = mode)
+    }
+
     fun updateSetting(key: String, value: Boolean) {
         when (key) {
             "auto_reconnect" -> {
@@ -182,8 +190,8 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(showNotifications = value)
             }
             "dark_theme" -> {
-                prefs.edit().putBoolean("dark_theme", value).apply()
-                _uiState.value = _uiState.value.copy(darkTheme = value)
+                // Сумісність зі старими версіями: перетворюємо у режим теми.
+                setThemeMode(if (value) "dark" else "light")
             }
             MINI_PLAYER_ALWAYS -> {
                 prefs.edit().putBoolean(MINI_PLAYER_ALWAYS, value).apply()
@@ -566,7 +574,7 @@ data class SettingsUiState(
     val esp32Ip: String = SettingsViewModel.DEFAULT_ESP32_IP,
     val autoReconnect: Boolean = true,
     val showNotifications: Boolean = true,
-    val darkTheme: Boolean = false,
+    val themeMode: String = "system",
     val miniPlayerAlways: Boolean = false,
     val seekStepSeconds: Int = 10,
     val seekHold: Boolean = false,

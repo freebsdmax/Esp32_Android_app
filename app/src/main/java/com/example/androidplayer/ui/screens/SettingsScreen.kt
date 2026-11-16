@@ -117,8 +117,8 @@ fun SettingsScreen(
         }
         item {
             AppearanceCard(
-                darkTheme = uiState.darkTheme,
-                onDarkThemeChange = { viewModel.updateSetting("dark_theme", it) }
+                themeMode = uiState.themeMode,
+                onThemeMode = { viewModel.setThemeMode(it) }
             )
         }
         item {
@@ -319,10 +319,11 @@ private fun BleConnectionCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AppearanceCard(
-    darkTheme: Boolean,
-    onDarkThemeChange: (Boolean) -> Unit
+    themeMode: String,
+    onThemeMode: (String) -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -334,17 +335,30 @@ private fun AppearanceCard(
                 title = tr("Зовнішній вигляд"),
                 subtitle = tr("Оформлення інтерфейсу")
             )
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(tr("Темна тема"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                    Text(
-                        tr("Застосовується одразу"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange)
+            Text(Loc.themeHint(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = themeMode == "system",
+                    onClick = { onThemeMode("system") },
+                    label = { Text(Loc.themeSystem()) }
+                )
+                FilterChip(
+                    selected = themeMode == "light",
+                    onClick = { onThemeMode("light") },
+                    label = { Text(Loc.themeLight()) }
+                )
+                FilterChip(
+                    selected = themeMode == "dark",
+                    onClick = { onThemeMode("dark") },
+                    label = { Text(Loc.themeDark()) }
+                )
             }
+            Text(Loc.themeAppliedNow(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
