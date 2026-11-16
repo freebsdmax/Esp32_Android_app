@@ -108,7 +108,7 @@ jobs:
             echo ""
             echo ""
             echo "## Встановлення"
-            echo '\`\`\`bash'
+            echo '```bash'
             echo "adb install -r Ford-Player-*.apk"
             echo '\`\`\`'
             echo ""
