@@ -440,27 +440,37 @@ class SettingsViewModel @Inject constructor(
 
     fun loadAutoplay() {
         viewModelScope.launch {
-            repository.getAutoplay().onSuccess { on ->
-                _uiState.value = _uiState.value.copy(autoplay = on)
+            repository.getAutoplay().onSuccess { a ->
+                _uiState.value = _uiState.value.copy(autoplay = a.ble, autoplaySlave = a.slave)
             }.onFailure { Timber.w(it, "Failed to load autoplay") }
         }
     }
 
-    fun setAutoplay(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(autoplay = enabled)
+    /** @param which "ble" (підключення застосунку) або "slave" (Bluetooth-модуль) */
+    fun setAutoplay(which: String, enabled: Boolean) {
+        val st = _uiState.value
+        val ble = if (which == "ble") enabled else st.autoplay
+        val slave = if (which == "slave") enabled else st.autoplaySlave
+        _uiState.value = st.copy(autoplay = ble, autoplaySlave = slave)
         viewModelScope.launch {
-            repository.setAutoplay(enabled).fold(
-                onSuccess = { on ->
+            repository.setAutoplay(ble, slave).fold(
+                onSuccess = { a ->
                     _uiState.value = _uiState.value.copy(
-                        autoplay = on,
+                        autoplay = a.ble,
+                        autoplaySlave = a.slave,
                         isSaved = true,
-                        saveMessage = if (on) tr("Автопрогравання увімкнено")
-                        else tr("Автопрогравання вимкнено")
+                        saveMessage = when {
+                            which == "ble" && a.ble -> tr("Автопрогравання (застосунок) увімкнено")
+                            which == "ble" -> tr("Автопрогравання (застосунок) вимкнено")
+                            a.slave -> tr("Автопрогравання на Bluetooth-модулі увімкнено")
+                            else -> tr("Автопрогравання на Bluetooth-модулі вимкнено")
+                        }
                     )
                 },
                 onFailure = { e ->
                     _uiState.value = _uiState.value.copy(
-                        autoplay = !enabled,
+                        autoplay = st.autoplay,
+                        autoplaySlave = st.autoplaySlave,
                         isSaved = false,
                         saveMessage = e.message ?: "Failed to change autoplay"
                     )
@@ -673,6 +683,7 @@ data class SettingsUiState(
     val netWifi: Boolean = true,
     val netWeb: Boolean = true,
     val autoplay: Boolean = false,
+    val autoplaySlave: Boolean = true,
     val webToken: String = "",
     val webTokenEnabled: Boolean = false,
     val bleName: String = "",

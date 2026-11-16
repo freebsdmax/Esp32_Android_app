@@ -390,6 +390,17 @@ object Loc {
             "Коли застосунок підключається до плати, програвання стартує саме: USB-трек (або знімається пауза), у режимі External — команда play телефону по AVRCP."
         else
             "When the app connects to the board, playback starts by itself: a USB track (or pause is released); in External mode a play command goes to the phone over AVRCP."
+    fun autoplaySlaveTitle(): String =
+        if (isUkrainian) "Автопрогравання на Bluetooth-модулі" else "Autoplay on the Bluetooth module"
+    fun autoplaySlaveSubtitle(): String =
+        if (isUkrainian) "Телефон підключився до Slave — музика стартує" else "Phone connects to the slave — music starts"
+    fun autoplaySlaveHint(): String =
+        if (isUkrainian)
+            "Slave сам надсилає AVRCP-play телефону, коли той підключається до Bluetooth-модуля. Працює навіть без застосунку."
+        else
+            "The slave sends AVRCP play to the phone when it connects to the Bluetooth module. Works even without the app."
+    fun autoplayBleTitle(): String =
+        if (isUkrainian) "Автопрогравання при підключенні застосунку" else "Autoplay when the app connects"
     fun autoplayOn(): String = if (isUkrainian) "Увімкнено" else "Enabled"
     fun autoplayOff(): String = if (isUkrainian) "Вимкнено" else "Disabled"
 

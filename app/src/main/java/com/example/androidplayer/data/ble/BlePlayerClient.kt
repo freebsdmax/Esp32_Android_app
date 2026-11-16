@@ -485,17 +485,30 @@ class BlePlayerClient(context: Context) {
         text
     }
 
-    /** Автопрогравання при підключенні по BLE. */
-    suspend fun getAutoplay(): Boolean =
-        JSONObject(rpc("autoplay.get")).optBoolean("enabled", false)
+    /** Автопрогравання: при підключенні застосунку (BLE) і на Slave (A2DP). */
+    data class AutoplaySettings(
+        val ble: Boolean = false,
+        val slave: Boolean = true
+    )
 
-    suspend fun setAutoplay(enabled: Boolean): Boolean {
-        val payload = JSONObject().put("enabled", enabled).toString()
+    suspend fun getAutoplay(): AutoplaySettings {
+        val json = JSONObject(rpc("autoplay.get"))
+        return AutoplaySettings(
+            ble = json.optBoolean("enabled", false),
+            slave = json.optBoolean("slave", true)
+        )
+    }
+
+    suspend fun setAutoplay(ble: Boolean, slave: Boolean): AutoplaySettings {
+        val payload = JSONObject().put("enabled", ble).put("slave", slave).toString()
         val json = JSONObject(rpc("autoplay.set", payload))
         if (!json.optBoolean("success")) {
             throw IllegalStateException(json.optString("error", "Autoplay was rejected"))
         }
-        return json.optBoolean("enabled", enabled)
+        return AutoplaySettings(
+            ble = json.optBoolean("enabled", ble),
+            slave = json.optBoolean("slave", slave)
+        )
     }
 
     /** Стан перемикачів мережі на платі. */

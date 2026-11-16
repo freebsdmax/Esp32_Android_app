@@ -141,8 +141,10 @@ fun SettingsScreen(
         }
         item {
             AutoplayCard(
-                enabled = uiState.autoplay,
-                onChange = { viewModel.setAutoplay(it) }
+                bleEnabled = uiState.autoplay,
+                slaveEnabled = uiState.autoplaySlave,
+                onBleChange = { viewModel.setAutoplay("ble", it) },
+                onSlaveChange = { viewModel.setAutoplay("slave", it) }
             )
         }
         item {
@@ -1050,29 +1052,56 @@ private fun UpdatesAutoCard(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AutoplayCard(
-    enabled: Boolean,
-    onChange: (Boolean) -> Unit
+    bleEnabled: Boolean,
+    slaveEnabled: Boolean,
+    onBleChange: (Boolean) -> Unit,
+    onSlaveChange: (Boolean) -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(Loc.autoplayTitle(), style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold)
+            Text(Loc.autoplaySubtitle(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            Divider()
+
+            /* Slave: головний перемикач — музика стартує, коли телефон
+               підключається до Bluetooth-модуля (працює без застосунку). */
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(Loc.autoplayTitle(), style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold)
-                    Text(Loc.autoplaySubtitle(), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(Loc.autoplaySlaveTitle(), style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium)
+                    Text(
+                        if (slaveEnabled) Loc.autoplayOn() else Loc.autoplayOff(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (slaveEnabled) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Switch(checked = enabled, onCheckedChange = onChange)
+                Switch(checked = slaveEnabled, onCheckedChange = onSlaveChange)
             }
-            Text(
-                if (enabled) Loc.autoplayOn() else Loc.autoplayOff(),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (enabled) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(Loc.autoplaySlaveHint(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            Divider()
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(Loc.autoplayBleTitle(), style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium)
+                    Text(
+                        if (bleEnabled) Loc.autoplayOn() else Loc.autoplayOff(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (bleEnabled) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = bleEnabled, onCheckedChange = onBleChange)
+            }
             Text(Loc.autoplayHint(), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
