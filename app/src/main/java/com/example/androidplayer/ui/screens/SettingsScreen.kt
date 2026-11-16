@@ -140,6 +140,12 @@ fun SettingsScreen(
             )
         }
         item {
+            AutoplayCard(
+                enabled = uiState.autoplay,
+                onChange = { viewModel.setAutoplay(it) }
+            )
+        }
+        item {
             NetworkCard(
                 wifi = uiState.netWifi,
                 web = uiState.netWeb,
@@ -1033,6 +1039,42 @@ private fun UpdatesAutoCard(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Автопрогравання при підключенні застосунку по BLE:
+ * USB-режим — стартує трек / знімається пауза, External — AVRCP-play на телефоні.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun AutoplayCard(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(Loc.autoplayTitle(), style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold)
+                    Text(Loc.autoplaySubtitle(), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = enabled, onCheckedChange = onChange)
+            }
+            Text(
+                if (enabled) Loc.autoplayOn() else Loc.autoplayOff(),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (enabled) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(Loc.autoplayHint(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

@@ -39,6 +39,7 @@ class SettingsViewModel @Inject constructor(
         loadCanConfig()
         loadCanKeys()
         loadNetToggles()
+        loadAutoplay()
         loadAuthConfig()
         loadBleName()
         loadLogsConfig()
@@ -437,6 +438,37 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun loadAutoplay() {
+        viewModelScope.launch {
+            repository.getAutoplay().onSuccess { on ->
+                _uiState.value = _uiState.value.copy(autoplay = on)
+            }.onFailure { Timber.w(it, "Failed to load autoplay") }
+        }
+    }
+
+    fun setAutoplay(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(autoplay = enabled)
+        viewModelScope.launch {
+            repository.setAutoplay(enabled).fold(
+                onSuccess = { on ->
+                    _uiState.value = _uiState.value.copy(
+                        autoplay = on,
+                        isSaved = true,
+                        saveMessage = if (on) tr("Автопрогравання увімкнено")
+                        else tr("Автопрогравання вимкнено")
+                    )
+                },
+                onFailure = { e ->
+                    _uiState.value = _uiState.value.copy(
+                        autoplay = !enabled,
+                        isSaved = false,
+                        saveMessage = e.message ?: "Failed to change autoplay"
+                    )
+                }
+            )
+        }
+    }
+
     /** @param which "wifi" або "web" */
     fun setNetEnabled(which: String, enabled: Boolean) {
         val st = _uiState.value
@@ -640,6 +672,7 @@ data class SettingsUiState(
     val canDebounceMs: Int = 500,
     val netWifi: Boolean = true,
     val netWeb: Boolean = true,
+    val autoplay: Boolean = false,
     val webToken: String = "",
     val webTokenEnabled: Boolean = false,
     val bleName: String = "",

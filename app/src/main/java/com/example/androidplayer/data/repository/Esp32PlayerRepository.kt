@@ -158,6 +158,16 @@ class Esp32PlayerRepository @Inject constructor(
         if (useBleTransport && bleClient != null) bleClient.setWifiSettings(settings) else api.setWifiSettings(settings)
     }
     
+    suspend fun getAutoplay(): Result<Boolean> = safeApiCall {
+        if (bleClient != null) bleClient.getAutoplay()
+        else throw IllegalStateException("BLE is required for autoplay settings")
+    }
+
+    suspend fun setAutoplay(enabled: Boolean): Result<Boolean> = safeApiCall {
+        if (bleClient != null) bleClient.setAutoplay(enabled)
+        else throw IllegalStateException("BLE is required for autoplay settings")
+    }
+
     suspend fun getNetToggles(): Result<com.example.androidplayer.data.ble.BlePlayerClient.NetToggles> =
         safeApiCall {
             if (bleClient != null) bleClient.getNetToggles()

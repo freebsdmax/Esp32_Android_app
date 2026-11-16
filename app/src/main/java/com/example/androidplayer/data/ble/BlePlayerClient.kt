@@ -80,7 +80,7 @@ class BlePlayerClient(context: Context) {
                 !_isConnected.value -> {
                     if (hasRememberedDevice()) {
                         Timber.d("BLE watchdog: reconnecting...")
-                        connectRememberedDevice()
+                        connectRememberedDevice(autoConnect = true)
                     }
                 }
                 // Link claims to be up, but the player service/notifications never became ready.
@@ -277,7 +277,7 @@ class BlePlayerClient(context: Context) {
                     gatt.close()
                     if (bluetoothGatt === gatt) bluetoothGatt = null
                     if (!explicitlyDisconnected && preferences.getString("device_address", null) != null) {
-                        reconnectHandler.postDelayed({ connectRememberedDevice() }, 1200)
+                        reconnectHandler.postDelayed({ connectRememberedDevice(autoConnect = true) }, 1200)
                     }
                 }
             }
@@ -483,6 +483,19 @@ class BlePlayerClient(context: Context) {
         }
         consecutiveRpcFailures = 0
         text
+    }
+
+    /** Автопрогравання при підключенні по BLE. */
+    suspend fun getAutoplay(): Boolean =
+        JSONObject(rpc("autoplay.get")).optBoolean("enabled", false)
+
+    suspend fun setAutoplay(enabled: Boolean): Boolean {
+        val payload = JSONObject().put("enabled", enabled).toString()
+        val json = JSONObject(rpc("autoplay.set", payload))
+        if (!json.optBoolean("success")) {
+            throw IllegalStateException(json.optString("error", "Autoplay was rejected"))
+        }
+        return json.optBoolean("enabled", enabled)
     }
 
     /** Стан перемикачів мережі на платі. */
@@ -1103,7 +1116,7 @@ class BlePlayerClient(context: Context) {
      * Підключення до пристрою
      */
     @SuppressLint("MissingPermission")
-    fun connect(device: BluetoothDevice): Boolean {
+    fun connect(device: BluetoothDevice, autoConnect: Boolean = false): Boolean {
         Timber.d("🔗 Connecting to ${device.name} (${device.address})")
         stopScan()
         explicitlyDisconnected = false
@@ -1132,7 +1145,9 @@ class BlePlayerClient(context: Context) {
 
         bluetoothGatt?.close()
         connectStartedAt = android.os.SystemClock.elapsedRealtime()
-        bluetoothGatt = device.connectGatt(context, false, gattCallback)
+        /* autoConnect=true: стек сам підключиться, коли пристрій знову
+           з'явиться в радіусі (використовується для фонових повторів). */
+        bluetoothGatt = device.connectGatt(context, autoConnect, gattCallback)
         reconnectHandler.removeCallbacks(reconnectWatchdog)
         reconnectHandler.postDelayed(reconnectWatchdog, 4000)
         connectedDevice = device
@@ -1141,7 +1156,7 @@ class BlePlayerClient(context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    fun connectRememberedDevice(): Boolean {
+    fun connectRememberedDevice(autoConnect: Boolean = false): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             Timber.w("BLE reconnect skipped: BLUETOOTH_CONNECT permission is missing")
@@ -1170,7 +1185,7 @@ class BlePlayerClient(context: Context) {
             Timber.e(e, "Saved BLE address is invalid")
             null
         } ?: return false
-        return connect(device)
+        return connect(device, autoConnect)
     }
 
     fun hasRememberedDevice(): Boolean = preferences.getString("device_address", null) != null

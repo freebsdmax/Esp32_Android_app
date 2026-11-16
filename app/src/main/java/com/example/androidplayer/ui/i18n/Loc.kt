@@ -381,6 +381,18 @@ object Loc {
 
     fun remove(): String = if (isUkrainian) "видалити" else "remove"
     fun clearAll(): String = if (isUkrainian) "Очистити всі" else "Clear all"
+    fun autoplayTitle(): String =
+        if (isUkrainian) "Автопрогравання" else "Autoplay"
+    fun autoplaySubtitle(): String =
+        if (isUkrainian) "Старт при підключенні по Bluetooth" else "Start on Bluetooth connect"
+    fun autoplayHint(): String =
+        if (isUkrainian)
+            "Коли застосунок підключається до плати, програвання стартує саме: USB-трек (або знімається пауза), у режимі External — команда play телефону по AVRCP."
+        else
+            "When the app connects to the board, playback starts by itself: a USB track (or pause is released); in External mode a play command goes to the phone over AVRCP."
+    fun autoplayOn(): String = if (isUkrainian) "Увімкнено" else "Enabled"
+    fun autoplayOff(): String = if (isUkrainian) "Вимкнено" else "Disabled"
+
     fun netTitle(): String = if (isUkrainian) "Мережа плати" else "Board network"
     fun netSubtitle(): String =
         if (isUkrainian) "Wi-Fi та веб-інтерфейс" else "Wi-Fi and web interface"
