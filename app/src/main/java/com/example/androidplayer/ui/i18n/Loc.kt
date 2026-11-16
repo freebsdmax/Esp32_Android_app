@@ -331,12 +331,12 @@ object Loc {
     fun canLearnDone(id: Long, data1: Int): String =
         if (isUkrainian) "Готово: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
         else "Done: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
-    fun themeSystem(): String = if (isUkrainian) "Системна" else "System"
+    fun themeSystem(): String = if (isUkrainian) "Авто" else "Auto"
     fun themeLight(): String = if (isUkrainian) "Світла" else "Light"
     fun themeDark(): String = if (isUkrainian) "Темна" else "Dark"
     fun themeHint(): String =
-        if (isUkrainian) "Системна — як у телефоні (за замовчуванням)"
-        else "System follows the phone (default)"
+        if (isUkrainian) "Авто — як у телефоні (за замовчуванням)"
+        else "Auto follows the phone (default)"
     fun themeAppliedNow(): String = if (isUkrainian) "Застосовується одразу" else "Applied immediately"
 
     fun canKeysTitle(): String = if (isUkrainian) "Вивчені кнопки" else "Learned buttons"

@@ -337,26 +337,39 @@ private fun AppearanceCard(
             )
             Text(Loc.themeHint(), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
                     selected = themeMode == "system",
                     onClick = { onThemeMode("system") },
-                    label = { Text(Loc.themeSystem()) }
+                    modifier = Modifier.weight(1f),
+                    label = {
+                        Text(Loc.themeSystem(), maxLines = 1,
+                            style = MaterialTheme.typography.labelMedium)
+                    }
                 )
                 FilterChip(
                     selected = themeMode == "light",
                     onClick = { onThemeMode("light") },
-                    label = { Text(Loc.themeLight()) }
+                    modifier = Modifier.weight(1f),
+                    label = {
+                        Text(Loc.themeLight(), maxLines = 1,
+                            style = MaterialTheme.typography.labelMedium)
+                    }
                 )
                 FilterChip(
                     selected = themeMode == "dark",
                     onClick = { onThemeMode("dark") },
-                    label = { Text(Loc.themeDark()) }
+                    modifier = Modifier.weight(1f),
+                    label = {
+                        Text(Loc.themeDark(), maxLines = 1,
+                            style = MaterialTheme.typography.labelMedium)
+                    }
                 )
             }
+
             Text(Loc.themeAppliedNow(), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
