@@ -68,6 +68,7 @@ fun MainNavigation() {
     }?.title ?: when (currentDestination?.route) {
         NavRoutes.SETTINGS -> tr("Налаштування")
         NavRoutes.USB_FLASH -> tr("Прошивка по кабелю")
+        NavRoutes.CAN_KEYS -> Loc.canKeysTitle()
         NavRoutes.BLE_DISCOVERY -> tr("BLE пристрої")
         else -> appName
     }
@@ -166,10 +167,14 @@ fun MainNavigation() {
                 SettingsScreen(
                     ble = ble,
                     onOpenBle = { navController.navigate(NavRoutes.BLE_DISCOVERY) { launchSingleTop = true } },
-            onOpenUsbFlash = { navController.navigate(NavRoutes.USB_FLASH) { launchSingleTop = true } }
+                    onOpenUsbFlash = { navController.navigate(NavRoutes.USB_FLASH) { launchSingleTop = true } },
+                    onOpenCanKeys = { navController.navigate(NavRoutes.CAN_KEYS) { launchSingleTop = true } }
                 )
             }
             composable(NavRoutes.USB_FLASH) { UsbFlashScreen() }
+        composable(NavRoutes.CAN_KEYS) {
+            CanKeysScreen(ble = ble)
+        }
         composable(NavRoutes.BLE_DISCOVERY) {
                 BleDiscoveryScreen(
                     onDeviceSelected = { },

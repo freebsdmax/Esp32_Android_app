@@ -31,4 +31,5 @@ object NavRoutes {
     const val SYSTEM_MONITOR = "/system_monitor"
     const val BLE_DISCOVERY = "/ble_discovery"
     const val USB_FLASH = "/usb_flash"
+    const val CAN_KEYS = "/can_keys"
 }

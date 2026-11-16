@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -56,6 +57,7 @@ fun SettingsScreen(
     ble: BlePlayerClient,
     onOpenBle: () -> Unit,
     onOpenUsbFlash: () -> Unit = {},
+    onOpenCanKeys: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -191,10 +193,8 @@ fun SettingsScreen(
                 learnStatus = canLearn,
                 onLearn = { action, secs -> viewModel.startCanLearn(action, secs) },
                 onLearnCancel = { viewModel.cancelCanLearn() },
-                keys = canKeys,
-                onRemoveKey = { viewModel.removeCanKey(it) },
-                onClearKeys = { viewModel.clearCanKeys() },
-                onReloadKeys = { viewModel.loadCanKeys() }
+                keyCount = canKeys.size,
+                onOpenKeys = onOpenCanKeys
             )
         }
         item {
@@ -686,10 +686,8 @@ private fun CanCard(
     learnStatus: String?,
     onLearn: (Int, Int) -> Unit,
     onLearnCancel: () -> Unit,
-    keys: List<BlePlayerClient.CanKey>,
-    onRemoveKey: (Int) -> Unit,
-    onClearKeys: () -> Unit,
-    onReloadKeys: () -> Unit
+    keyCount: Int,
+    onOpenKeys: () -> Unit
 ) {
     var idText by remember(id) { mutableStateOf("0x" + id.toString(16).uppercase()) }
     var mnText by remember(maskNext) { mutableStateOf("0x" + maskNext.toString(16).uppercase()) }
@@ -810,32 +808,10 @@ private fun CanCard(
             }
 
             Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(Loc.canKeysTitle(), style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                TextButton(onClick = onReloadKeys) {
-                    Text(tr("Оновити"), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            if (keys.isEmpty()) {
-                Text(Loc.canKeysEmpty(), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                keys.forEachIndexed { index, k ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            Loc.canKeyRow(k.action, k.id, k.byte, k.mask, k.value),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = { onRemoveKey(index) }) {
-                            Text(Loc.remove(), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                OutlinedButton(onClick = onClearKeys, modifier = Modifier.fillMaxWidth()) {
-                    Text(Loc.clearAll())
-                }
+            OutlinedButton(onClick = onOpenKeys, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.VpnKey, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("${Loc.canKeysTitle()} ($keyCount)")
             }
         }
     }

@@ -367,8 +367,27 @@ object Loc {
             "$name: ID=0x${id.toString(16).uppercase()}, byte$byte&0x${mask.toString(16).uppercase()}=0x${value.toString(16).uppercase()}"
         }
     }
+    fun canKeysScreenHint(): String =
+        if (isUkrainian)
+            "Кожен рядок — навчена кнопка авто. Натискання кнопки виконує дію (NEXT/PREV/MODE). Зайві рядки можна видалити."
+        else
+            "Each row is a learned car button. Pressing it runs the action (NEXT/PREV/MODE). Delete rows you do not need."
+    fun canKeysClearConfirmTitle(): String =
+        if (isUkrainian) "Очистити всі кнопки?" else "Clear all buttons?"
+    fun canKeysClearConfirmText(): String =
+        if (isUkrainian) "Усі навчені кнопки буде видалено з плати." else "All learned buttons will be removed from the device."
+    fun cancel(): String = if (isUkrainian) "Скасувати" else "Cancel"
+    fun refresh(): String = if (isUkrainian) "Оновити" else "Refresh"
+
     fun remove(): String = if (isUkrainian) "видалити" else "remove"
     fun clearAll(): String = if (isUkrainian) "Очистити всі" else "Clear all"
+    fun updReinstallFirmware(): String =
+        if (isUkrainian) "Прошити цю версію ще раз" else "Flash this version again"
+    fun updReinstallApp(): String =
+        if (isUkrainian) "Встановити цю версію знову" else "Install this version again"
+    fun updReinstallSlave(): String =
+        if (isUkrainian) "Прошити Slave ще раз" else "Flash slave again"
+
     fun canLearnFailed(): String =
         if (isUkrainian) "Кадр не знайдено — спробуй ще раз" else "No frame found — try again"
 

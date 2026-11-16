@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,7 +72,10 @@ fun UpdatesCard(
                 actionText = Loc.updInstall(),
                 enabled = state.appUpdate && !state.busy,
                 onAction = onInstallApp,
-                upToDateText = Loc.updUpToDate()
+                upToDateText = Loc.updUpToDate(),
+                reinstallText = Loc.updReinstallApp(),
+                onReinstall = onInstallApp,
+                reinstallEnabled = state.appLatest != null && !state.busy
             )
 
             UpdateRow(
@@ -82,7 +86,10 @@ fun UpdatesCard(
                 actionText = if (state.connected) Loc.updFlash() else Loc.updNoConnection(),
                 enabled = state.slaveUpdate && state.connected && !state.busy,
                 onAction = onFlashSlave,
-                upToDateText = if (state.connected) Loc.updUpToDate() else Loc.updNoConnection()
+                upToDateText = if (state.connected) Loc.updUpToDate() else Loc.updNoConnection(),
+                reinstallText = Loc.updReinstallSlave(),
+                onReinstall = onFlashSlave,
+                reinstallEnabled = state.slaveLatest != null && state.connected && !state.busy
             )
 
             UpdateRow(
@@ -93,7 +100,10 @@ fun UpdatesCard(
                 actionText = if (state.connected) Loc.updFlash() else Loc.updNoConnection(),
                 enabled = state.fwUpdate && state.connected && !state.busy,
                 onAction = onFlashFirmware,
-                upToDateText = if (state.connected) Loc.updUpToDate() else Loc.updNoConnection()
+                upToDateText = if (state.connected) Loc.updUpToDate() else Loc.updNoConnection(),
+                reinstallText = Loc.updReinstallFirmware(),
+                onReinstall = onFlashFirmware,
+                reinstallEnabled = state.fwLatest != null && state.connected && !state.busy
             )
 
             if (state.busy) {
@@ -134,7 +144,10 @@ private fun UpdateRow(
     actionText: String,
     enabled: Boolean,
     onAction: () -> Unit,
-    upToDateText: String
+    upToDateText: String,
+    reinstallText: String,
+    onReinstall: () -> Unit,
+    reinstallEnabled: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = MaterialTheme.typography.bodyLarge,
@@ -153,6 +166,17 @@ private fun UpdateRow(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(actionText, style = MaterialTheme.typography.labelLarge)
+            }
+        } else {
+            // Немає новішої версії — та сама кнопка прошиває поточну ще раз
+            // (переустановка: корисно після збою або щоб повернути робочу версію).
+            OutlinedButton(
+                onClick = onReinstall,
+                enabled = reinstallEnabled,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(reinstallText, style = MaterialTheme.typography.labelLarge)
             }
         }
     }
