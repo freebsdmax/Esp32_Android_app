@@ -485,6 +485,32 @@ class BlePlayerClient(context: Context) {
         text
     }
 
+    /** Стан перемикачів мережі на платі. */
+    data class NetToggles(
+        val wifi: Boolean = true,
+        val web: Boolean = true
+    )
+
+    suspend fun getNetToggles(): NetToggles {
+        val json = JSONObject(rpc("net.get"))
+        return NetToggles(
+            wifi = json.optBoolean("wifi", true),
+            web = json.optBoolean("web", true)
+        )
+    }
+
+    suspend fun setNetToggles(wifi: Boolean, web: Boolean): NetToggles {
+        val payload = JSONObject().put("wifi", wifi).put("web", web).toString()
+        val json = JSONObject(rpc("net.set", payload, timeoutMs = 8000))
+        if (!json.optBoolean("success")) {
+            throw IllegalStateException(json.optString("error", "Network settings were rejected"))
+        }
+        return NetToggles(
+            wifi = json.optBoolean("wifi", wifi),
+            web = json.optBoolean("web", web)
+        )
+    }
+
     suspend fun getWifiSettings(): WifiSettings {
         val json = JSONObject(rpc("wifi.get"))
         return WifiSettings(

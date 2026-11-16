@@ -140,6 +140,14 @@ fun SettingsScreen(
             )
         }
         item {
+            NetworkCard(
+                wifi = uiState.netWifi,
+                web = uiState.netWeb,
+                onWifi = { viewModel.setNetEnabled("wifi", it) },
+                onWeb = { viewModel.setNetEnabled("web", it) }
+            )
+        }
+        item {
             AudioProfileCard(
                 profile = uiState.audioProfile,
                 onSelect = { viewModel.saveAudioProfile(it) }
@@ -1025,6 +1033,64 @@ private fun UpdatesAutoCard(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Wi-Fi та веб-інтерфейс плати: застосунок працює по BLE, тому обидва
+ * можна вимкнути, щоб не тримати зайвий радіомодуль і HTTP-сервер.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun NetworkCard(
+    wifi: Boolean,
+    web: Boolean,
+    onWifi: (Boolean) -> Unit,
+    onWeb: (Boolean) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeader(
+                icon = Icons.Default.Wifi,
+                title = Loc.netTitle(),
+                subtitle = Loc.netSubtitle()
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(Loc.netWifi(), style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium)
+                    Text(
+                        if (wifi) tr("увімкнено") else tr("вимкнено"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (wifi) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = wifi, onCheckedChange = onWifi)
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(Loc.netWeb(), style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium)
+                    Text(
+                        if (!wifi) tr("недоступно без Wi-Fi")
+                        else if (web) tr("увімкнено") else tr("вимкнено"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (web && wifi) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = web, onCheckedChange = onWeb, enabled = wifi)
+            }
+
+            Text(Loc.netHint(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

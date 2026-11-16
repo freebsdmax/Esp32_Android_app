@@ -38,6 +38,7 @@ class SettingsViewModel @Inject constructor(
         loadSeekConfig()
         loadCanConfig()
         loadCanKeys()
+        loadNetToggles()
         loadAuthConfig()
         loadBleName()
         loadLogsConfig()
@@ -428,6 +429,46 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun loadNetToggles() {
+        viewModelScope.launch {
+            repository.getNetToggles().onSuccess { t ->
+                _uiState.value = _uiState.value.copy(netWifi = t.wifi, netWeb = t.web)
+            }.onFailure { Timber.w(it, "Failed to load network toggles") }
+        }
+    }
+
+    /** @param which "wifi" або "web" */
+    fun setNetEnabled(which: String, enabled: Boolean) {
+        val st = _uiState.value
+        val wifi = if (which == "wifi") enabled else st.netWifi
+        val web = if (which == "web") enabled else st.netWeb
+        // Оптимістично показуємо новий стан, потім підтверджуємо з плати.
+        _uiState.value = st.copy(netWifi = wifi, netWeb = web)
+        viewModelScope.launch {
+            repository.setNetToggles(wifi, web).fold(
+                onSuccess = { t ->
+                    _uiState.value = _uiState.value.copy(
+                        netWifi = t.wifi,
+                        netWeb = t.web,
+                        isSaved = true,
+                        saveMessage = if (which == "wifi")
+                            (if (t.wifi) tr("Wi-Fi увімкнено") else tr("Wi-Fi вимкнено"))
+                        else
+                            (if (t.web) tr("Веб-інтерфейс увімкнено") else tr("Веб-інтерфейс вимкнено"))
+                    )
+                },
+                onFailure = { e ->
+                    _uiState.value = _uiState.value.copy(
+                        netWifi = st.netWifi,
+                        netWeb = st.netWeb,
+                        isSaved = false,
+                        saveMessage = e.message ?: "Failed to change network"
+                    )
+                }
+            )
+        }
+    }
+
     private val _canKeys = MutableStateFlow<List<com.example.androidplayer.data.ble.BlePlayerClient.CanKey>>(emptyList())
     val canKeys: StateFlow<List<com.example.androidplayer.data.ble.BlePlayerClient.CanKey>> =
         _canKeys.asStateFlow()
@@ -597,6 +638,8 @@ data class SettingsUiState(
     val canMaskPrev: Int = 0x80,
     val canMaskMode: Int = 0x10,
     val canDebounceMs: Int = 500,
+    val netWifi: Boolean = true,
+    val netWeb: Boolean = true,
     val webToken: String = "",
     val webTokenEnabled: Boolean = false,
     val bleName: String = "",

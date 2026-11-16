@@ -158,6 +158,20 @@ class Esp32PlayerRepository @Inject constructor(
         if (useBleTransport && bleClient != null) bleClient.setWifiSettings(settings) else api.setWifiSettings(settings)
     }
     
+    suspend fun getNetToggles(): Result<com.example.androidplayer.data.ble.BlePlayerClient.NetToggles> =
+        safeApiCall {
+            if (bleClient != null) bleClient.getNetToggles()
+            else throw IllegalStateException("BLE is required for network settings")
+        }
+
+    suspend fun setNetToggles(
+        wifi: Boolean,
+        web: Boolean
+    ): Result<com.example.androidplayer.data.ble.BlePlayerClient.NetToggles> = safeApiCall {
+        if (bleClient != null) bleClient.setNetToggles(wifi, web)
+        else throw IllegalStateException("BLE is required for network settings")
+    }
+
     suspend fun toggleSniffer(enabled: Boolean): Result<String> = safeApiCall {
         if (useBleTransport && bleClient != null) bleClient.toggleSniffer(enabled)
         else api.toggleSniffer("set_sniffer", if (enabled) 1 else 0)

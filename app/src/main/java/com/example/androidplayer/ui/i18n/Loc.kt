@@ -381,6 +381,17 @@ object Loc {
 
     fun remove(): String = if (isUkrainian) "видалити" else "remove"
     fun clearAll(): String = if (isUkrainian) "Очистити всі" else "Clear all"
+    fun netTitle(): String = if (isUkrainian) "Мережа плати" else "Board network"
+    fun netSubtitle(): String =
+        if (isUkrainian) "Wi-Fi та веб-інтерфейс" else "Wi-Fi and web interface"
+    fun netWifi(): String = "Wi-Fi (AP/STA)"
+    fun netWeb(): String = if (isUkrainian) "Веб-інтерфейс (порт 80)" else "Web interface (port 80)"
+    fun netHint(): String =
+        if (isUkrainian)
+            "Застосунок працює по BLE, тому Wi-Fi і веб можна вимкнути — для плеєра вони не потрібні. Вимкнений веб-інтерфейс звільняє пам'ять і закриває доступ до плати з мережі."
+        else
+            "The app works over BLE, so Wi-Fi and the web UI can be switched off. Disabling the web UI frees memory and closes network access to the board."
+
     fun updReinstallFirmware(): String =
         if (isUkrainian) "Прошити цю версію ще раз" else "Flash this version again"
     fun updReinstallApp(): String =
