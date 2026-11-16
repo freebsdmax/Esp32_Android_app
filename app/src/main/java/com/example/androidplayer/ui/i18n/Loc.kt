@@ -318,7 +318,7 @@ object Loc {
     fun canLearnTitle(): String =
         if (isUkrainian) "🎓 Навчання кнопок" else "🎓 Learn buttons"
     fun canLearnHint(): String =
-        if (isUkrainian) "Слухаємо шину, потім натисни кнопку в авто"
+        if (isUkrainian) "Слухаємо шину, потім натисни й утримуй кнопку ~1 с"
         else "Listening to the bus, then press the button in the car"
     fun canLearnNext(): String = if (isUkrainian) "NEXT" else "NEXT"
     fun canLearnPrev(): String = if (isUkrainian) "PREV" else "PREV"
