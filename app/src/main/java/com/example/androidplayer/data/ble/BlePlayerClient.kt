@@ -52,6 +52,12 @@ import com.example.androidplayer.ui.i18n.tr
  * BLE Player клієнт для управління ESP32 плеєром по Bluetooth LE
  */
 class BlePlayerClient(context: Context) {
+
+    companion object {
+        /** Скільки разів повторювати запис CCCD, поки стек GATT зайнятий. */
+        private const val MAX_CCCD_RETRIES = 20
+    }
+
     private val context = context
     private val preferences = context.applicationContext.getSharedPreferences("ble_player", Context.MODE_PRIVATE)
     private val reconnectHandler = Handler(Looper.getMainLooper())
@@ -147,6 +153,8 @@ class BlePlayerClient(context: Context) {
     private var playlistCharacteristic: BluetoothGattCharacteristic? = null
     private var logsCharacteristic: BluetoothGattCharacteristic? = null
     private val pendingNotificationDescriptors = ArrayDeque<BluetoothGattDescriptor>()
+    /** Скільки разів повторювали запис CCCD, поки стек GATT був зайнятий. */
+    private var notificationRetries = 0
     private val commandWriteLock = Any()
     private val pendingCommandWrites = ArrayDeque<ByteArray>()
     private val pendingOtaWrites = ArrayDeque<ByteArray>()
@@ -362,12 +370,22 @@ class BlePlayerClient(context: Context) {
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
             super.onDescriptorWrite(gatt, descriptor, status)
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                Timber.e("❌ CCCD write failed for ${descriptor.characteristic.uuid}: $status")
+                Timber.w("⚠️ CCCD write failed for ${descriptor.characteristic.uuid}: $status")
+                if (notificationRetries < MAX_CCCD_RETRIES && bluetoothGatt === gatt) {
+                    // Транзієнтна відмова стека: повертаємо дескриптор у чергу
+                    // і пробуємо ще раз, а не показуємо помилку одразу.
+                    pendingNotificationDescriptors.addFirst(descriptor)
+                    notificationRetries++
+                    mainHandler.removeCallbacks(notificationRetry)
+                    mainHandler.postDelayed(notificationRetry, 250L * notificationRetries)
+                    return
+                }
                 pendingNotificationDescriptors.clear()
                 _notificationsReady.value = false
-                _serviceError.value = "BLE notifications failed: $status"
+                _serviceError.value = tr("Не вдалося увімкнути BLE-сповіщення") + " ($status)"
                 return
             }
+            notificationRetries = 0
             writeNextNotificationDescriptor(gatt)
         }
 
@@ -437,20 +455,71 @@ class BlePlayerClient(context: Context) {
         }
     }
 
+    /** Повтор запису CCCD, коли GATT-стек зайнятий іншою операцією. */
+    private val notificationRetry = Runnable {
+        bluetoothGatt?.let { gatt ->
+            if (_isConnected.value) writeNextNotificationDescriptor(gatt)
+        }
+    }
+
+    /**
+     * Вмикає сповіщення по черзі: Status -> Playlist -> Logs.
+     *
+     * `writeDescriptor()` може повернути false, якщо стек GATT зайнятий
+     * (у момент підключення ще йде MTU-запит або discovery). Раніше це одразу
+     * давало червону помилку — тепер дескриптор повертається в чергу і запис
+     * повторюється з наростаючою паузою.
+     */
     @SuppressLint("MissingPermission")
     private fun writeNextNotificationDescriptor(gatt: BluetoothGatt) {
+        if (bluetoothGatt !== gatt) return
+
         val descriptor = pendingNotificationDescriptors.pollFirst()
         if (descriptor == null) {
             _notificationsReady.value = true
+            _serviceError.value = null
             healAttempts = 0
             consecutiveRpcFailures = 0
+            notificationRetries = 0
+            mainHandler.removeCallbacks(notificationRetry)
             Timber.d("✅ BLE notifications enabled")
             return
         }
-        if (!gatt.writeDescriptor(descriptor)) {
+
+        var started = false
+        try {
+            started = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                val code = gatt.writeDescriptor(
+                    descriptor,
+                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                )
+                code == android.bluetooth.BluetoothStatusCodes.SUCCESS
+            } else {
+                @Suppress("DEPRECATION")
+                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                @Suppress("DEPRECATION")
+                gatt.writeDescriptor(descriptor)
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "CCCD write threw")
+        }
+
+        if (started) return
+
+        // Стек зайнятий — повертаємо дескриптор на початок черги і чекаємо.
+        pendingNotificationDescriptors.addFirst(descriptor)
+        notificationRetries++
+        if (notificationRetries <= MAX_CCCD_RETRIES) {
+            Timber.w(
+                "BLE: CCCD write busy for ${descriptor.characteristic.uuid}, " +
+                    "retry $notificationRetries/$MAX_CCCD_RETRIES"
+            )
+            mainHandler.removeCallbacks(notificationRetry)
+            mainHandler.postDelayed(notificationRetry, 100L + notificationRetries * 50L)
+        } else {
             pendingNotificationDescriptors.clear()
             _notificationsReady.value = false
-            _serviceError.value = "Could not enable BLE notifications"
+            _serviceError.value = tr("Не вдалося увімкнути BLE-сповіщення")
             Timber.e("❌ Could not write CCCD for ${descriptor.characteristic.uuid}")
         }
     }
@@ -1147,6 +1216,8 @@ class BlePlayerClient(context: Context) {
         playlistCharacteristic = null
         logsCharacteristic = null
         pendingNotificationDescriptors.clear()
+        notificationRetries = 0
+        mainHandler.removeCallbacks(notificationRetry)
         synchronized(commandWriteLock) {
             pendingCommandWrites.clear()
             commandWriteInProgress = false
