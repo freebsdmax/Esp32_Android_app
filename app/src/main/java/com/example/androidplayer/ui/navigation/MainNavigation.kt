@@ -1,6 +1,7 @@
 package com.example.androidplayer.ui.navigation
 
 import com.example.androidplayer.ui.i18n.tr
+import com.example.androidplayer.util.AppLabel
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,18 +58,20 @@ fun MainNavigation() {
         NavigationItem(tr("Логи"), Icons.Default.Terminal, NavRoutes.SYSTEM_MONITOR)
     )
 
+    val context = LocalContext.current
+    val appName = AppLabel.current(context)
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val currentTitle = items.firstOrNull { item ->
+    val currentTitle = if (currentDestination?.route == NavRoutes.PLAYER) appName else items.firstOrNull { item ->
         currentDestination?.hierarchy?.any { it.route == item.route } == true
     }?.title ?: when (currentDestination?.route) {
         NavRoutes.SETTINGS -> tr("Налаштування")
         NavRoutes.USB_FLASH -> tr("Прошивка по кабелю")
         NavRoutes.BLE_DISCOVERY -> tr("BLE пристрої")
-        else -> tr("Ford Player")
+        else -> appName
     }
 
-    val context = LocalContext.current
     val ble = remember {
         EntryPointAccessors.fromApplication(context.applicationContext, BleEntryPoint::class.java).bleClient()
     }

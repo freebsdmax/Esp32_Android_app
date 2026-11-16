@@ -118,7 +118,9 @@ fun SettingsScreen(
         item {
             AppearanceCard(
                 themeMode = uiState.themeMode,
-                onThemeMode = { viewModel.setThemeMode(it) }
+                onThemeMode = { viewModel.setThemeMode(it) },
+                appLabel = uiState.appLabel,
+                onSaveAppLabel = { viewModel.setAppLabel(it) }
             )
         }
         item {
@@ -323,8 +325,11 @@ private fun BleConnectionCard(
 @Composable
 private fun AppearanceCard(
     themeMode: String,
-    onThemeMode: (String) -> Unit
+    onThemeMode: (String) -> Unit,
+    appLabel: String,
+    onSaveAppLabel: (String) -> Unit
 ) {
+    var labelText by remember(appLabel) { mutableStateOf(appLabel) }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
@@ -372,6 +377,22 @@ private fun AppearanceCard(
 
             Text(Loc.themeAppliedNow(), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(Loc.appNameTitle(), style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium)
+            Text(Loc.appNameHint(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(
+                value = labelText,
+                onValueChange = { labelText = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(onClick = { onSaveAppLabel(labelText) }, modifier = Modifier.fillMaxWidth()) {
+                Text(Loc.save())
+            }
         }
     }
 }

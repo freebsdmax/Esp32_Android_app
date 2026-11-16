@@ -134,6 +134,7 @@ class SettingsViewModel @Inject constructor(
         val savedIp = prefs.getString("esp32_ip", DEFAULT_ESP32_IP) ?: DEFAULT_ESP32_IP
         val autoReconnect = prefs.getBoolean("auto_reconnect", true)
         val showNotifications = prefs.getBoolean("show_notifications", true)
+        val appLabel = com.example.androidplayer.util.AppLabel.current(context)
         val themeMode = prefs.getString("theme_mode", null)
             ?: if (prefs.contains("dark_theme"))
                 (if (prefs.getBoolean("dark_theme", false)) "dark" else "light")
@@ -145,6 +146,7 @@ class SettingsViewModel @Inject constructor(
             autoReconnect = autoReconnect,
             showNotifications = showNotifications,
             themeMode = themeMode,
+            appLabel = appLabel,
             miniPlayerAlways = miniPlayerAlways,
             updateAuto = checker.autoEnabled,
             updateIntervalHours = checker.intervalHours,
@@ -174,6 +176,12 @@ class SettingsViewModel @Inject constructor(
     /**
      * Обновление настроек
      */
+    fun setAppLabel(label: String) {
+        com.example.androidplayer.util.AppLabel.save(context, label)
+        val effective = com.example.androidplayer.util.AppLabel.current(context)
+        _uiState.value = _uiState.value.copy(appLabel = effective)
+    }
+
     fun setThemeMode(mode: String) {
         prefs.edit().putString("theme_mode", mode).apply()
         _uiState.value = _uiState.value.copy(themeMode = mode)
@@ -575,6 +583,7 @@ data class SettingsUiState(
     val autoReconnect: Boolean = true,
     val showNotifications: Boolean = true,
     val themeMode: String = "system",
+    val appLabel: String = "Ford Player",
     val miniPlayerAlways: Boolean = false,
     val seekStepSeconds: Int = 10,
     val seekHold: Boolean = false,

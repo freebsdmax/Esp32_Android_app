@@ -331,6 +331,12 @@ object Loc {
     fun canLearnDone(id: Long, data1: Int): String =
         if (isUkrainian) "Готово: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
         else "Done: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
+    fun save(): String = if (isUkrainian) "Зберегти" else "Save"
+
+    fun appNameTitle(): String = if (isUkrainian) "Назва застосунку" else "App name"
+    fun appNameHint(): String =
+        if (isUkrainian) "Порожньо — стандартна назва. Змінює назву в системі (останні застосунки, заголовок вікна)."
+        else "Empty — default name. Changes the system label (recents, window title)."
     fun themeSystem(): String = if (isUkrainian) "Авто" else "Auto"
     fun themeLight(): String = if (isUkrainian) "Світла" else "Light"
     fun themeDark(): String = if (isUkrainian) "Темна" else "Dark"

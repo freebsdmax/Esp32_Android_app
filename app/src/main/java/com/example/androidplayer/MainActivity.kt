@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.androidplayer.ui.navigation.MainNavigation
 import com.example.androidplayer.ui.theme.AndroidPlayerTheme
+import com.example.androidplayer.util.AppLabel
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -32,6 +33,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         requestNotificationPermission()
+        AppLabel.apply(this)
+        title = AppLabel.current(this)
 
         setContent {
             AndroidPlayerTheme {
@@ -43,6 +46,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        title = AppLabel.current(this)
     }
 
     /** Needed on Android 13+ so OTA progress/result notifications are visible. */
