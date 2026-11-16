@@ -333,6 +333,12 @@ object Loc {
         else "Done: ID=0x${id.toString(16).uppercase()}, data[1]=0x${data1.toString(16).uppercase()}"
     fun save(): String = if (isUkrainian) "Зберегти" else "Save"
 
+    fun pinShortcut(): String =
+        if (isUkrainian) "Створити ярлик з цією назвою" else "Create shortcut with this name"
+    fun pinShortcutHint(): String =
+        if (isUkrainian) "Підпис самої іконки програми Android змінювати не дає, але ярлик на робочому столі може мати будь-яку назву."
+        else "Android does not allow renaming the app icon, but a home-screen shortcut can have any name."
+
     fun appNameTitle(): String = if (isUkrainian) "Назва застосунку" else "App name"
     fun appNameHint(): String =
         if (isUkrainian) "Порожньо — стандартна назва. Змінює назву в системі (останні застосунки, заголовок вікна)."

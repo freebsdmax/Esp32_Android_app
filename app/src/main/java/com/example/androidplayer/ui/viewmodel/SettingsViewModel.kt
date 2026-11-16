@@ -182,6 +182,10 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(appLabel = effective)
     }
 
+    fun pinAppShortcut(label: String) {
+        com.example.androidplayer.util.AppLabel.pinShortcut(context, label)
+    }
+
     fun setThemeMode(mode: String) {
         prefs.edit().putString("theme_mode", mode).apply()
         _uiState.value = _uiState.value.copy(themeMode = mode)

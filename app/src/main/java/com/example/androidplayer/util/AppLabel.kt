@@ -1,6 +1,12 @@
 package com.example.androidplayer.util
 
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
+import com.example.androidplayer.MainActivity
+import com.example.androidplayer.R
 import android.os.Build
 import timber.log.Timber
 
@@ -34,6 +40,28 @@ object AppLabel {
      * Тому назва застосовується до заголовка вікна/списку недавніх застосунків
      * (MainActivity.title) і показується в інтерфейсі.
      */
+    /**
+     * Android не дозволяє змінити підпис іконки самої програми, але дозволяє
+     * створити ярлик на робочому столі з БУДЬ-ЯКОЮ назвою (ShortcutManager).
+     * Це те, чим користуються «перейменувачі» застосунків.
+     */
+    fun pinShortcut(context: Context, label: String) {
+        val name = label.trim().ifBlank { current(context) }
+        runCatching {
+            val shortcut = ShortcutInfoCompat.Builder(context, "custom_name")
+                .setShortLabel(name.take(40))
+                .setLongLabel(name)
+                .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+                .setIntent(
+                    Intent(context, MainActivity::class.java)
+                        .setAction(Intent.ACTION_MAIN)
+                        .addCategory(Intent.CATEGORY_LAUNCHER)
+                )
+                .build()
+            ShortcutManagerCompat.requestPinShortcut(context, shortcut, null)
+        }.onFailure { Timber.w(it, "pin shortcut failed") }
+    }
+
     fun apply(context: Context) {
         // нічого: заголовок виставляє MainActivity
     }

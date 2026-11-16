@@ -120,7 +120,8 @@ fun SettingsScreen(
                 themeMode = uiState.themeMode,
                 onThemeMode = { viewModel.setThemeMode(it) },
                 appLabel = uiState.appLabel,
-                onSaveAppLabel = { viewModel.setAppLabel(it) }
+                onSaveAppLabel = { viewModel.setAppLabel(it) },
+                onPinShortcut = { viewModel.pinAppShortcut(it) }
             )
         }
         item {
@@ -327,7 +328,8 @@ private fun AppearanceCard(
     themeMode: String,
     onThemeMode: (String) -> Unit,
     appLabel: String,
-    onSaveAppLabel: (String) -> Unit
+    onSaveAppLabel: (String) -> Unit,
+    onPinShortcut: (String) -> Unit
 ) {
     var labelText by remember(appLabel) { mutableStateOf(appLabel) }
     ElevatedCard(
@@ -393,6 +395,14 @@ private fun AppearanceCard(
             Button(onClick = { onSaveAppLabel(labelText) }, modifier = Modifier.fillMaxWidth()) {
                 Text(Loc.save())
             }
+            OutlinedButton(
+                onClick = { onPinShortcut(labelText) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(Loc.pinShortcut())
+            }
+            Text(Loc.pinShortcutHint(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
