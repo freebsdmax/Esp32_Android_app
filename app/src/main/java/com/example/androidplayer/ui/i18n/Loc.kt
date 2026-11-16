@@ -318,12 +318,16 @@ object Loc {
     fun canLearnTitle(): String =
         if (isUkrainian) "🎓 Навчання кнопок" else "🎓 Learn buttons"
     fun canLearnHint(): String =
-        if (isUkrainian) "Слухаємо шину, потім натисни й утримуй кнопку ~1 с"
+        if (isUkrainian) "Слухаємо шину, потім тримай кнопку ~5 секунд"
         else "Listening to the bus, then press the button in the car"
     fun canLearnNext(): String = if (isUkrainian) "NEXT" else "NEXT"
     fun canLearnPrev(): String = if (isUkrainian) "PREV" else "PREV"
     fun canLearnMode(): String = if (isUkrainian) "MODE" else "MODE"
     fun canLearnCancel(): String = if (isUkrainian) "Скасувати" else "Cancel"
+    fun canLearnBackgroundBg(sec: Int, bg: Int): String =
+        if (isUkrainian) "Фон: $bg ID, залишилось $sec с" else "Background: $bg IDs, $sec s left"
+    fun canLearnSeconds(): String = if (isUkrainian) "Фон, с" else "Background, s"
+
     fun canLearnBackground(sec: Int): String =
         if (isUkrainian) "Слухаю шину… залишилось $sec с" else "Listening… $sec s left"
     fun canLearnPress(sec: Int): String =

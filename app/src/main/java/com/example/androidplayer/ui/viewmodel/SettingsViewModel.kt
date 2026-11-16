@@ -456,7 +456,7 @@ class SettingsViewModel @Inject constructor(
     val canLearnStatus: StateFlow<String?> = _canLearnStatus.asStateFlow()
 
     /** Запускає навчання CAN-кнопки: 0=NEXT, 1=PREV, 2=MODE. */
-    fun startCanLearn(action: Int, seconds: Int = 12) {
+    fun startCanLearn(action: Int, seconds: Int = 20) {
         viewModelScope.launch {
             _canLearnStatus.value = Loc.canLearnBackground(seconds)
             repository.canLearnStart(action, seconds).onFailure {
@@ -469,7 +469,7 @@ class SettingsViewModel @Inject constructor(
                 waited += 500
                 val st = repository.canLearnStatus().getOrNull() ?: continue
                 when (st.state) {
-                    1 -> _canLearnStatus.value = Loc.canLearnBackground(st.secsLeft)
+                    1 -> _canLearnStatus.value = Loc.canLearnBackgroundBg(st.secsLeft, st.bg)
                     2 -> _canLearnStatus.value = Loc.canLearnPress(st.secsLeft)
                     3 -> {
                         _canLearnStatus.value = Loc.canLearnDone(st.id, st.data1)

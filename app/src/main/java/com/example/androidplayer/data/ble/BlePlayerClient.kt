@@ -904,7 +904,9 @@ class BlePlayerClient(context: Context) {
         val action: Int,
         val secsLeft: Int,
         val id: Long,
-        val data1: Int
+        val data1: Int,
+        /** скільки унікальних ID зібрано у фоні */
+        val bg: Int = 0
     )
 
     data class CanKey(val id: Long, val byte: Int, val mask: Int, val value: Int, val action: Int)
@@ -952,7 +954,8 @@ class BlePlayerClient(context: Context) {
             action = json.optInt("action", 0),
             secsLeft = json.optInt("secs_left", 0),
             id = json.optLong("id", 0),
-            data1 = json.optInt("data1", 0)
+            data1 = json.optInt("data1", 0),
+            bg = json.optInt("bg", 0)
         )
     }
 

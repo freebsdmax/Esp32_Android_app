@@ -189,7 +189,7 @@ fun SettingsScreen(
                 onField = { key, value -> viewModel.setCanField(key, value) },
                 onSave = { viewModel.saveCanConfig() },
                 learnStatus = canLearn,
-                onLearn = { viewModel.startCanLearn(it) },
+                onLearn = { action, secs -> viewModel.startCanLearn(action, secs) },
                 onLearnCancel = { viewModel.cancelCanLearn() },
                 keys = canKeys,
                 onRemoveKey = { viewModel.removeCanKey(it) },
@@ -684,7 +684,7 @@ private fun CanCard(
     onField: (String, Long) -> Unit,
     onSave: () -> Unit,
     learnStatus: String?,
-    onLearn: (Int) -> Unit,
+    onLearn: (Int, Int) -> Unit,
     onLearnCancel: () -> Unit,
     keys: List<BlePlayerClient.CanKey>,
     onRemoveKey: (Int) -> Unit,
@@ -784,9 +784,23 @@ private fun CanCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(onClick = { onLearn(0) }) { Text(Loc.canLearnNext()) }
-                OutlinedButton(onClick = { onLearn(1) }) { Text(Loc.canLearnPrev()) }
-                OutlinedButton(onClick = { onLearn(2) }) { Text(Loc.canLearnMode()) }
+                var learnSecs by remember { mutableStateOf("20") }
+                OutlinedTextField(
+                    value = learnSecs,
+                    onValueChange = { learnSecs = it.filter { ch -> ch.isDigit() }.take(3) },
+                    label = { Text(Loc.canLearnSeconds()) },
+                    singleLine = true,
+                    modifier = Modifier.width(110.dp)
+                )
+                OutlinedButton(onClick = { onLearn(0, learnSecs.toIntOrNull() ?: 20) }) {
+                    Text(Loc.canLearnNext())
+                }
+                OutlinedButton(onClick = { onLearn(1, learnSecs.toIntOrNull() ?: 20) }) {
+                    Text(Loc.canLearnPrev())
+                }
+                OutlinedButton(onClick = { onLearn(2, learnSecs.toIntOrNull() ?: 20) }) {
+                    Text(Loc.canLearnMode())
+                }
                 OutlinedButton(onClick = onLearnCancel) { Text(Loc.canLearnCancel()) }
             }
 
