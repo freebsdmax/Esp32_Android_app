@@ -21,9 +21,7 @@ class AndroidPlayerApplication : Application() {
         AppNotify.init(this)
         
         // Инициализация Timber для логирования
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree())
-        }
+        Timber.plant(Timber.DebugTree())
         
         val checkerEntry = EntryPointAccessors.fromApplication(this, UpdateCheckerEntryPoint::class.java)
         checkerEntry.updateChecker().start()

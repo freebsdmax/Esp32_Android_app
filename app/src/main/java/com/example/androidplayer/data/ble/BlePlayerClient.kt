@@ -155,6 +155,10 @@ class BlePlayerClient(context: Context) {
     private val pendingNotificationDescriptors = ArrayDeque<BluetoothGattDescriptor>()
     /** Скільки разів повторювали запис CCCD, поки стек GATT був зайнятий. */
     private var notificationRetries = 0
+    /** Коли почався поточний запис команди (щоб знімати «завислий» прапорець). */
+    @Volatile private var commandWriteStartedAt = 0L
+    /** Discovery вже запитано, повторно не викликаємо. */
+    @Volatile private var discoveryRequested = false
     private val commandWriteLock = Any()
     private val pendingCommandWrites = ArrayDeque<ByteArray>()
     private val pendingOtaWrites = ArrayDeque<ByteArray>()
@@ -214,6 +218,7 @@ class BlePlayerClient(context: Context) {
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            if (bluetoothGatt !== gatt) return   // колбек старого клієнта після reconnect
             super.onConnectionStateChange(gatt, status, newState)
             if (bluetoothGatt !== gatt) {
                 // Callback from an abandoned connection attempt. Letting it through
@@ -237,8 +242,9 @@ class BlePlayerClient(context: Context) {
                     servicesDiscovered = false
                     negotiatedMtu = 23
                     observedCommandBytes = 0
+                    discoveryRequested = false
                     if (!gatt.requestMtu(512)) {
-                        gatt.discoverServices()
+                        requestDiscovery(gatt)
                     } else {
                         // Some stacks never deliver onMtuChanged after the board reboots
                         // (OTA / power cycle). Discover services anyway so the app does not
@@ -246,7 +252,7 @@ class BlePlayerClient(context: Context) {
                         mainHandler.postDelayed({
                             if (bluetoothGatt === gatt && !servicesDiscovered) {
                                 Timber.w("BLE: MTU callback missing, discovering services anyway")
-                                gatt.discoverServices()
+                                requestDiscovery(gatt)
                             }
                         }, 1500)
                     }
@@ -298,12 +304,14 @@ class BlePlayerClient(context: Context) {
             // Re-discovering services tears down CCCD subscriptions, which would
             // break an update in progress. Only discover once per connection.
             if (!servicesDiscovered) {
-                gatt.discoverServices()
+                requestDiscovery(gatt)
             }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             super.onServicesDiscovered(gatt, status)
+            if (bluetoothGatt !== gatt) return
+            discoveryRequested = false
             
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 servicesDiscovered = true
@@ -345,6 +353,7 @@ class BlePlayerClient(context: Context) {
                         descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                         pendingNotificationDescriptors.addLast(descriptor)
                     }
+                    Timber.d("CCCD: queued=%d, starting", pendingNotificationDescriptors.size)
                     writeNextNotificationDescriptor(gatt)
                 } else {
                     _serviceError.value = "Player GATT service not found; update ESP32 firmware"
@@ -358,7 +367,7 @@ class BlePlayerClient(context: Context) {
                     discoveryRetries++
                     Timber.w("BLE: service discovery failed ($status), retry $discoveryRetries")
                     mainHandler.postDelayed({
-                        if (!servicesDiscovered && bluetoothGatt === gatt) gatt.discoverServices()
+                        if (!servicesDiscovered && bluetoothGatt === gatt) requestDiscovery(gatt)
                     }, 700)
                 } else {
                     _notificationsReady.value = false
@@ -369,6 +378,7 @@ class BlePlayerClient(context: Context) {
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
             super.onDescriptorWrite(gatt, descriptor, status)
+            if (bluetoothGatt !== gatt) return
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 Timber.w("⚠️ CCCD write failed for ${descriptor.characteristic.uuid}: $status")
                 if (notificationRetries < MAX_CCCD_RETRIES && bluetoothGatt === gatt) {
@@ -390,6 +400,8 @@ class BlePlayerClient(context: Context) {
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            if (bluetoothGatt !== gatt) return
+            commandWriteStartedAt = 0L
             if (otaWriteInProgress) {
                 synchronized(otaWriteLock) { otaWriteInProgress = false }
                 startNextOtaWrite()
@@ -455,6 +467,17 @@ class BlePlayerClient(context: Context) {
         }
     }
 
+    /** Один запит discovery на одне підключення. */
+    @SuppressLint("MissingPermission")
+    private fun requestDiscovery(gatt: BluetoothGatt) {
+        if (discoveryRequested) return
+        discoveryRequested = true
+        if (!gatt.discoverServices()) {
+            discoveryRequested = false
+            Timber.w("discoverServices() rejected")
+        }
+    }
+
     /** Повтор запису CCCD, коли GATT-стек зайнятий іншою операцією. */
     private val notificationRetry = Runnable {
         bluetoothGatt?.let { gatt ->
@@ -472,7 +495,25 @@ class BlePlayerClient(context: Context) {
      */
     @SuppressLint("MissingPermission")
     private fun writeNextNotificationDescriptor(gatt: BluetoothGatt) {
-        if (bluetoothGatt !== gatt) return
+        if (bluetoothGatt !== gatt) {
+            Timber.d("CCCD: stale gatt, skip")
+            return
+        }
+        Timber.d(
+            "CCCD: next queue=%d cmdBusy=%s otaBusy=%s ready=%s",
+            pendingNotificationDescriptors.size,
+            commandWriteInProgress,
+            otaWriteInProgress,
+            _notificationsReady.value
+        )
+
+        if (commandWriteInProgress || otaWriteInProgress) {
+            if (notificationRetries < MAX_CCCD_RETRIES) {
+                mainHandler.removeCallbacks(notificationRetry)
+                mainHandler.postDelayed(notificationRetry, 120)
+            }
+            return
+        }
 
         val descriptor = pendingNotificationDescriptors.pollFirst()
         if (descriptor == null) {
@@ -488,18 +529,10 @@ class BlePlayerClient(context: Context) {
 
         var started = false
         try {
-            started = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                val code = gatt.writeDescriptor(
-                    descriptor,
-                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                )
-                code == android.bluetooth.BluetoothStatusCodes.SUCCESS
-            } else {
-                @Suppress("DEPRECATION")
-                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                @Suppress("DEPRECATION")
-                gatt.writeDescriptor(descriptor)
-            }
+            @Suppress("DEPRECATION")
+            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            @Suppress("DEPRECATION")
+            started = gatt.writeDescriptor(descriptor)
         } catch (e: Exception) {
             Timber.w(e, "CCCD write threw")
         }
@@ -1599,6 +1632,19 @@ class BlePlayerClient(context: Context) {
             synchronized(commandWriteLock) { commandWriteInProgress = false }
             return
         }
+        // Спершу вмикаємо сповіщення (CCCD), лише потім шлемо команди.
+        if (!_notificationsReady.value) {
+            mainHandler.postDelayed({ startNextCommandWrite() }, 120)
+            return
+        }
+        // «Завислий» запис: відповіді немає понад 3 с — звільняємо стек.
+        if (commandWriteInProgress && commandWriteStartedAt > 0 &&
+            android.os.SystemClock.elapsedRealtime() - commandWriteStartedAt > 3000
+        ) {
+            Timber.w("BLE: command write timed out, resetting")
+            synchronized(commandWriteLock) { commandWriteInProgress = false }
+            commandWriteStartedAt = 0L
+        }
         synchronized(writeArbiter) {
         if (otaWriteInProgress || synchronized(otaWriteLock) { pendingOtaWrites.isNotEmpty() }) {
             mainHandler.postDelayed({ startNextCommandWrite() }, 3)
@@ -1625,7 +1671,9 @@ class BlePlayerClient(context: Context) {
         }
         characteristic.value = commandBytes
         characteristic.writeType = WRITE_TYPE_DEFAULT
+        commandWriteStartedAt = android.os.SystemClock.elapsedRealtime()
         if (!gatt.writeCharacteristic(characteristic)) {
+            commandWriteStartedAt = 0L
             Timber.e("❌ Could not start BLE command write")
             synchronized(commandWriteLock) { commandWriteInProgress = false }
             mainHandler.postDelayed({ startNextCommandWrite() }, 5)
